@@ -1,13 +1,6 @@
-# AIDL24_SelfDriving
+# Config
 
-Students: Jordi Sabatés, Marc Ramon, Marc and Fermin
-Advisor: Daniel Fojo
-
-Please guys create your own git branches (name the branches with your names): git checkout -b [name_of_the_branch]
-
-To check the branch I am currently modifiying: git branch
-
-To check the main branch: git checkout main
-
-
+- Here we’ll store configuration files.
+- Commonly, a config.yaml or config.json file holds hyperparameters, paths, and other settings.
+- Keeps our hyperparameters separate from the code.
 
