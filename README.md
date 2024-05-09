@@ -9,7 +9,7 @@ Please guys create your own git branches (name the branches with your names): gi
 
 To check the branch I am currently modifiying: git branch
 
-To check the main branch: git checkout main
+To check the main branch: git checkout main.
 
 
 
