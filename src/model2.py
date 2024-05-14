@@ -14,6 +14,7 @@ class LaneVehicleDetectionNet(nn.Module):
         # Initialize the backbone network using a pre-trained ResNet50 model, excluding the final classification layers
         backbone = models.resnet50(pretrained=True)
         self.backbone = nn.Sequential(*list(backbone.children())[:-2])
+        # Explanation: ResNet50 is a powerful CNN model pre-trained on ImageNet. The last two layers are excluded as they are specific to ImageNet classification.
         
         # Define the Feature Pyramid Network (FPN) to handle multi-scale feature extraction
         self.fpn = nn.ModuleList([
@@ -22,6 +23,7 @@ class LaneVehicleDetectionNet(nn.Module):
             nn.Conv2d(512, 256, 1), # 1x1 convolution for the third feature map
             nn.Conv2d(256, 256, 1), # 1x1 convolution for the fourth feature map
         ])
+        # Explanation: The FPN helps in extracting features from different layers of the backbone. The 1x1 convolutions reduce the number of channels to a uniform size (256) for easier processing.
         
         # Define the Region Proposal Network (RPN) to generate proposals for object detection
         self.rpn = nn.ModuleList([
@@ -29,11 +31,13 @@ class LaneVehicleDetectionNet(nn.Module):
             nn.Conv2d(256, self.num_anchors * 2, 1),  # 1x1 convolution for anchor classification
             nn.Conv2d(256, self.num_anchors * 4, 1), # 1x1 convolution for bounding box regression
         ])
+        # Explanation: The RPN proposes regions where objects might be. The 3x3 convolution extracts features, while the 1x1 convolutions output classification scores and bounding box deltas for each anchor.
         
         # Define RoI Align for pooling features from the proposed regions   
         self.roi_align = MultiScaleRoIAlign(featmap_names=['0', '1', '2', '3'], # Feature maps from the FPN layers
                                             output_size=7, # Output size for RoI align
                                             sampling_ratio=2) # Sampling ratio for RoI align
+        # Explanation: RoI Align pools features from proposed regions into a fixed size (7x7), enabling subsequent classification and regression. The sampling ratio helps determine the precision of pooling.
         
         # Define the detection head for classifying objects and regressing bounding boxes
         self.classifier = nn.Sequential(
@@ -41,12 +45,14 @@ class LaneVehicleDetectionNet(nn.Module):
             nn.ReLU(),                    # Activation function
             nn.Linear(1024, num_classes)  # Output layer for class logits
         )
+        # Explanation: The detection head classifies objects within proposed regions. The 7x7 feature map is flattened and processed through fully connected layers to produce class scores.
         
         self.bbox_regressor = nn.Sequential(
             nn.Linear(256 * 7 * 7, 1024), # Fully connected layer for bounding box regression
             nn.ReLU(),                    # Activation function
             nn.Linear(1024, num_classes * 4) # Output layer for bounding box coordinates
         )
+        # Explanation: The bounding box regressor predicts the coordinates of bounding boxes for each class. The output size is num_classes * 4 because each box has 4 coordinates (x, y, width, height).
         
         # Define the lane detection head for semantic segmentation of lanes
         self.lane_head = nn.Sequential(
@@ -56,6 +62,7 @@ class LaneVehicleDetectionNet(nn.Module):
             nn.ReLU(),                         # Activation function
             nn.Conv2d(64, 1, 1)                # 1x1 convolution for binary segmentation output
         )
+        # Explanation: The lane detection head segments lanes in the image. The convolutions extract and refine features, and the final 1x1 convolution outputs a binary mask indicating lane locations.
 
     def forward(self, images, targets=None):
         # Forward pass through the backbone to extract features
@@ -63,6 +70,7 @@ class LaneVehicleDetectionNet(nn.Module):
         
         # Pass features through the FPN layers to get multi-scale features
         fpn_features = [fpn_layer(features[i]) for i, fpn_layer in enumerate(self.fpn)]
+        # Explanation: The backbone features are passed through FPN layers to get multi-scale feature maps, which help in detecting objects of various sizes.
         
         # Initialize lists to store RPN classification logits and bounding box predictions
         rpn_logits, rpn_bbox = [], []
@@ -70,17 +78,22 @@ class LaneVehicleDetectionNet(nn.Module):
             rpn_feat = rpn_layer(fpn_features)
             rpn_logits.append(rpn_feat[:, :self.num_anchors * 2, :, :])
             rpn_bbox.append(rpn_feat[:, self.num_anchors * 4:, :, :])
+        # Explanation: For each FPN feature map, apply RPN layers to get classification scores and bounding box predictions. These are collected in lists.
         
         # Use RoI Align to pool features from the proposed regions (proposals assumed to be generated)
         rois = self.roi_align(fpn_features, targets)
+        # Explanation: RoI Align pools features from the regions proposed by the RPN, transforming them into fixed-size feature maps for further processing.
         
         # Flatten the pooled features and pass through the detection head
         detection_features = rois.view(rois.size(0), -1)
         class_logits = self.classifier(detection_features)
         bbox_preds = self.bbox_regressor(detection_features)
+        # Explanation: The pooled features are flattened and passed through the detection head to produce class logits and bounding box predictions.
         
         # Forward pass through the lane detection head for semantic segmentation
         lane_preds = self.lane_head(fpn_features[0])
+        # Explanation: The topmost FPN feature map is used for lane segmentation. The lane detection head processes it to produce a binary mask indicating lanes.
+
         
         # Return the outputs: class logits, bounding box predictions, and lane predictions
         return class_logits, bbox_preds, lane_preds
