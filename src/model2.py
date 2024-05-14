@@ -5,7 +5,8 @@ import torchvision.models as models
 from torchvision.ops import MultiScaleRoIAlign, RoIPool
 
 class LaneVehicleDetectionNet(nn.Module):
-    def __init__(self, num_classes, num_anchors=9):
+    def __init__(self, num_classes, num_anchors=9 ):
+        # num_anchors=9: This is a common choice, providing a sufficient variety of anchor box shapes and sizes to cover different object dimensions.
         super(LaneVehicleDetectionNet, self).__init__()
 
         # Number of anchor boxes used in the RPN
@@ -24,7 +25,9 @@ class LaneVehicleDetectionNet(nn.Module):
             nn.Conv2d(256, 256, 1), # 1x1 convolution for the fourth feature map
         ])
         # Explanation: The FPN helps in extracting features from different layers of the backbone. The 1x1 convolutions reduce the number of channels to a uniform size (256) for easier processing.
-        
+        # 2048, 1024, 512, 256 channels in FPN: These correspond to feature maps from different layers of the ResNet50 backbone.
+        # 1x1 convolutions in FPN: These reduce the number of channels to a uniform size (256) for consistency and easier processing.
+
         # Define the Region Proposal Network (RPN) to generate proposals for object detection
         self.rpn = nn.ModuleList([
             nn.Conv2d(256, 256, 3, padding=1), # 3x3 convolution for feature extraction
@@ -32,13 +35,15 @@ class LaneVehicleDetectionNet(nn.Module):
             nn.Conv2d(256, self.num_anchors * 4, 1), # 1x1 convolution for bounding box regression
         ])
         # Explanation: The RPN proposes regions where objects might be. The 3x3 convolution extracts features, while the 1x1 convolutions output classification scores and bounding box deltas for each anchor.
-        
+        # 3x3 and 1x1 convolutions in RPN: The 3x3 convolutions are for feature extraction, while the 1x1 convolutions output classification scores and bounding box predictions for each anchor.
+
         # Define RoI Align for pooling features from the proposed regions   
         self.roi_align = MultiScaleRoIAlign(featmap_names=['0', '1', '2', '3'], # Feature maps from the FPN layers
                                             output_size=7, # Output size for RoI align
                                             sampling_ratio=2) # Sampling ratio for RoI align
         # Explanation: RoI Align pools features from proposed regions into a fixed size (7x7), enabling subsequent classification and regression. The sampling ratio helps determine the precision of pooling.
-        
+        # output_size=7 in RoI Align: This standard size allows the network to process RoIs consistently, regardless of their original dimensions.
+
         # Define the detection head for classifying objects and regressing bounding boxes
         self.classifier = nn.Sequential(
             nn.Linear(256 * 7 * 7, 1024), # Fully connected layer for classification
@@ -46,14 +51,16 @@ class LaneVehicleDetectionNet(nn.Module):
             nn.Linear(1024, num_classes)  # Output layer for class logits
         )
         # Explanation: The detection head classifies objects within proposed regions. The 7x7 feature map is flattened and processed through fully connected layers to produce class scores.
-        
+        # 256 * 7 * 7 in detection head: The RoI Align output size (7x7) and the number of channels (256) determine the input size for the fully connected layers in the detection head.
+
         self.bbox_regressor = nn.Sequential(
             nn.Linear(256 * 7 * 7, 1024), # Fully connected layer for bounding box regression
             nn.ReLU(),                    # Activation function
             nn.Linear(1024, num_classes * 4) # Output layer for bounding box coordinates
         )
         # Explanation: The bounding box regressor predicts the coordinates of bounding boxes for each class. The output size is num_classes * 4 because each box has 4 coordinates (x, y, width, height).
-        
+        # num_classes * 4 in bbox_regressor: Each bounding box is represented by four coordinates (x, y, width, height), so the output size is proportional to the number of classes.
+
         # Define the lane detection head for semantic segmentation of lanes
         self.lane_head = nn.Sequential(
             nn.Conv2d(256, 128, 3, padding=1), # 3x3 convolution for feature extraction
