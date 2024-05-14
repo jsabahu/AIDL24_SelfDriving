@@ -40,10 +40,12 @@ class LaneVehicleDetectionNet(nn.Module):
         # Explanation: The RPN proposes regions where objects might be. The 3x3 convolution extracts features, while the 1x1 convolutions output classification scores and bounding box deltas for each anchor.
         # 3x3 and 1x1 convolutions in RPN: The 3x3 convolutions are for feature extraction, while the 1x1 convolutions output classification scores and bounding box predictions for each anchor.
 
-        # Define RoI Align for pooling features from the proposed regions   
+        # Define RoI Align for pooling features from the proposed regions 
+        # MultiScaleRoIAlign is a PyTorch operation used to extract fixed-size feature maps from different levels of a feature pyramid network (FPN) for each region of interest (RoI).  
         self.roi_align = MultiScaleRoIAlign(featmap_names=['0', '1', '2', '3'], # Feature maps from the FPN layers
                                             output_size=7, # Output size for RoI align
-                                            sampling_ratio=2) # Sampling ratio for RoI align
+                                            sampling_ratio=2) # Sampling ratio for RoI align.
+        # A sampling_ratio of 2 means that for each output pixel, 2x2 sampling points are used to compute the value, enhancing the precision of the RoI alignment.
         # Explanation: RoI Align pools features from proposed regions into a fixed size (7x7), enabling subsequent classification and regression. The sampling ratio helps determine the precision of pooling.
         # output_size=7 in RoI Align: This standard size allows the network to process RoIs consistently, regardless of their original dimensions.
 
