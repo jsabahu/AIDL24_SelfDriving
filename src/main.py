@@ -2,25 +2,7 @@ import torch
 from torch.utils import data
 from torchvision import transforms
 from dataloader import MyDataset
-from dataloader import UnZipFolder
-import shutil
-import os
-
-# UnZip DataSet
-if os.path.exists("data/images") or os.path.exists("data/mask"):
-    print("Images or Mask folder exists")
-else:
-    UnZipFolder("D:/DataSet (NuScenes)/v1.0-trainval01_blobs.tgz", "samples/CAM_FRONT/", "data/images")
-    #UnZipFolder("D:/DataSet (NuScenes)/v1.0-trainval02_blobs.tgz", "samples/CAM_FRONT/", "data/images")
-    #UnZipFolder("D:/DataSet (NuScenes)/v1.0-trainval03_blobs.tgz", "samples/CAM_FRONT/", "data/images")
-    #UnZipFolder("D:/DataSet (NuScenes)/v1.0-trainval04_blobs.tgz", "samples/CAM_FRONT/", "data/images")
-    #UnZipFolder("D:/DataSet (NuScenes)/v1.0-trainval05_blobs.tgz", "samples/CAM_FRONT/", "data/images")
-    #UnZipFolder("D:/DataSet (NuScenes)/v1.0-trainval06_blobs.tgz", "samples/CAM_FRONT/", "data/images")
-    #UnZipFolder("D:/DataSet (NuScenes)/v1.0-trainval07_blobs.tgz", "samples/CAM_FRONT/", "data/images")
-    #UnZipFolder("D:/DataSet (NuScenes)/v1.0-trainval08_blobs.tgz", "samples/CAM_FRONT/", "data/images")
-    #UnZipFolder("D:/DataSet (NuScenes)/v1.0-trainval09_blobs.tgz", "samples/CAM_FRONT/", "data/images")
-    #UnZipFolder("D:/DataSet (NuScenes)/v1.0-trainval10_blobs.tgz", "samples/CAM_FRONT/", "data/images")
-    shutil.copytree("data/images", "data/mask")
+from utils import UnZipFolder
 
 #print(len(list_files_in_folder("data\samples")))
 my_dataset = MyDataset(images_path="data\images",mask_path="data\mask",transform=transforms.ToTensor())
