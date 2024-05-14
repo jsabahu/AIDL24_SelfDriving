@@ -31,8 +31,11 @@ class LaneVehicleDetectionNet(nn.Module):
         # Define the Region Proposal Network (RPN) to generate proposals for object detection
         self.rpn = nn.ModuleList([
             nn.Conv2d(256, 256, 3, padding=1), # 3x3 convolution for feature extraction
-            nn.Conv2d(256, self.num_anchors * 2, 1),  # 1x1 convolution for anchor classification
-            nn.Conv2d(256, self.num_anchors * 4, 1), # 1x1 convolution for bounding box regression
+            nn.Conv2d(256, self.num_anchors * 2, 1),  # 1x1 convolution for anchor classification. 
+            # self.num_anchors * 2: Number of output channels, where self.num_anchors is the number of anchor boxes, and 2 corresponds to the two possible classes (object or background).
+            nn.Conv2d(256, self.num_anchors * 4, 1), # 1x1 convolution for bounding box regression.
+            #self.num_anchors * 4: Number of output channels, where self.num_anchors is the number of anchor boxes, and 4 corresponds to the four coordinates (x, y, width, height) required to regress each bounding box.
+
         ])
         # Explanation: The RPN proposes regions where objects might be. The 3x3 convolution extracts features, while the 1x1 convolutions output classification scores and bounding box deltas for each anchor.
         # 3x3 and 1x1 convolutions in RPN: The 3x3 convolutions are for feature extraction, while the 1x1 convolutions output classification scores and bounding box predictions for each anchor.
