@@ -95,11 +95,22 @@ class LaneVehicleDetectionNet(nn.Module):
         # Explanation: The backbone features are passed through FPN layers to get multi-scale feature maps, which help in detecting objects of various sizes.
         
         # Initialize lists to store RPN classification logits and bounding box predictions
+        # Loop through RPN layers and apply them to the feature maps from the FPN
         rpn_logits, rpn_bbox = [], []
         for rpn_layer in self.rpn:
+            # Apply the current RPN layer to the feature maps from the FPN
             rpn_feat = rpn_layer(fpn_features)
+                
+            # Extract and append the classification scores (logits) for the anchors
+            # rpn_feat[:, :self.num_anchors * 2, :, :] slices the output feature map to get the first self.num_anchors * 2 channels
+            # These channels represent the classification scores for each anchor (object vs. background)
             rpn_logits.append(rpn_feat[:, :self.num_anchors * 2, :, :])
-            rpn_bbox.append(rpn_feat[:, self.num_anchors * 4:, :, :])
+                
+            # Extract and append the bounding box regression predictions for the anchors
+            # rpn_feat[:, self.num_anchors * 2:self.num_anchors * 6, :, :] slices the output feature map to get the next self.num_anchors * 4 channels
+            # These channels represent the bounding box regression predictions for each anchor (4 coordinates: x, y, width, height)
+            rpn_bbox.append(rpn_feat[:, self.num_anchors * 2:self.num_anchors * 6, :, :])
+            
         # Explanation: For each FPN feature map, apply RPN layers to get classification scores and bounding box predictions. These are collected in lists.
         
         # Use RoI Align to pool features from the proposed regions (proposals assumed to be generated)
