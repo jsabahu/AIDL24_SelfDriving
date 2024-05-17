@@ -41,27 +41,56 @@ class CustomBackbone(nn.Module):
         # First layer in the block: convolutional layer with in_channels to out_channels,
         # 3x3 kernel, specified stride, and padding of 1
         layers.append(nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1))
-        
+
         # Batch normalization for the first layer in the block
         layers.append(nn.BatchNorm2d(out_channels))
-        
+
         # ReLU activation function applied in-place
         layers.append(nn.ReLU(inplace=True))
-        
+
         # Loop to add additional layers if blocks > 1
         for _ in range(1, blocks):
             # Convolutional layer with out_channels for both input and output,
             # 3x3 kernel, and padding of 1
             layers.append(nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1))
-            
+
             # Batch normalization for additional layers
             layers.append(nn.BatchNorm2d(out_channels))
-            
+
             # ReLU activation function applied in-place for additional layers
             layers.append(nn.ReLU(inplace=True))
-        
+
         # Combine all layers into a sequential module
         return nn.Sequential(*layers)
+    
+    def forward(self, x):
+        # Apply the first convolutional layer
+        x = self.conv1(x)
+        
+        # Apply batch normalization to the output of the first convolutional layer
+        x = self.bn1(x)
+        
+        # Apply ReLU activation function to introduce non-linearity
+        x = self.relu(x)
+        
+        # Apply max pooling to reduce the spatial dimensions
+        x = self.maxpool(x)
+    
+        # Pass the output through the first block of layers
+        x = self.layer1(x)
+        
+        # Pass the output through the second block of layers
+        x = self.layer2(x)
+        
+        # Pass the output through the third block of layers
+        x = self.layer3(x)
+        
+        # Pass the output through the fourth block of layers
+        x = self.layer4(x)
+    
+        # Return the final output after all layers
+        return x
+
 
 
 class LaneVehicleDetectionNet(nn.Module):
