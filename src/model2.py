@@ -146,25 +146,12 @@ class LaneVehicleDetectionNetYOLO(nn.Module):
         # The sampling ratio helps determine the precision of pooling.
         # output_size=7 in RoI Align: This standard size allows the network to process RoIs consistently, regardless of their original dimensions.
 
-        # Define the detection head for classifying objects and regressing bounding boxes
-        self.classifier = nn.Sequential(
-            nn.Linear(256 * 7 * 7, 1024), # Fully connected layer for classification
-            nn.ReLU(),                    # Activation function
-            nn.Linear(1024, num_classes)  # Output layer for class logits
+        # Detection head for predicting class scores, bounding boxes, and lane segmentation
+        self.detection_head = nn.Sequential(
+            nn.Conv2d(256, 512, 3, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(512, self.num_anchors * (5 + self.num_classes), 1)  # 5: (4 bounding box coordinates + 1 objectness score)
         )
-        # Explanation: The detection head classifies objects within proposed regions.
-        # The 7x7 feature map is flattened and processed through fully connected layers to produce class scores.
-        # 256 * 7 * 7 in detection head:
-        # The RoI Align output size (7x7) and the number of channels (256) determine the input size for the fully connected layers in the detection head.
-
-        self.bbox_regressor = nn.Sequential(
-            nn.Linear(256 * 7 * 7, 1024), # Fully connected layer for bounding box regression
-            nn.ReLU(),                    # Activation function
-            nn.Linear(1024, num_classes * 4) # Output layer for bounding box coordinates
-        )
-        # Explanation: The bounding box regressor predicts the coordinates of bounding boxes for each class.
-        # The output size is num_classes * 4 because each box has 4 coordinates (x, y, width, height).
-        # num_classes * 4 in bbox_regressor: Each bounding box is represented by four coordinates (x, y, width, height), so the output size is proportional to the number of classes.
 
         # Define the lane detection head for semantic segmentation of lanes
         self.lane_head = nn.Sequential(
@@ -182,31 +169,8 @@ class LaneVehicleDetectionNetYOLO(nn.Module):
         features = self.backbone(images)
         
         # Pass features through the FPN layers to get multi-scale features
-        fpn_features = [fpn_layer(features[i]) for i, fpn_layer in enumerate(self.fpn)]
+        fpn_features = [fpn_layer(features) for fpn_layer in self.fpn]
         # Explanation: The backbone features are passed through FPN layers to get multi-scale feature maps, which help in detecting objects of various sizes.
-        
-        # Initialize lists to store RPN classification logits and bounding box predictions
-        # Loop through RPN layers and apply them to the feature maps from the FPN
-        rpn_logits, rpn_bbox = [], []
-        for rpn_layer in self.rpn:
-            # Apply the current RPN layer to the feature maps from the FPN
-            rpn_feat = rpn_layer(fpn_features)
-                
-            # Extract and append the classification scores (logits) for the anchors
-            # rpn_feat[:, :self.num_anchors * 2, :, :] slices the output feature map to get the first self.num_anchors * 2 channels
-            # These channels represent the classification scores for each anchor (object vs. background)
-            rpn_logits.append(rpn_feat[:, :self.num_anchors * 2, :, :])
-                
-            # Extract and append the bounding box regression predictions for the anchors
-            # rpn_feat[:, self.num_anchors * 2:self.num_anchors * 6, :, :] slices the output feature map to get the next self.num_anchors * 4 channels
-            # These channels represent the bounding box regression predictions for each anchor (4 coordinates: x, y, width, height)
-            rpn_bbox.append(rpn_feat[:, self.num_anchors * 2:self.num_anchors * 6, :, :])
-            
-        # Explanation: For each FPN feature map, apply RPN layers to get classification scores and bounding box predictions. These are collected in lists.
-        
-        # Use RoI Align to pool features from the proposed regions (proposals assumed to be generated)
-        rois = self.roi_align(fpn_features, targets)
-        # Explanation: RoI Align pools features from the regions proposed by the RPN, transforming them into fixed-size feature maps for further processing.
         
         # Flatten the pooled features and pass through the detection head
         detection_features = rois.view(rois.size(0), -1)
