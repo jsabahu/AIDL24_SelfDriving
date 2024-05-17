@@ -120,9 +120,9 @@ class LaneVehicleDetectionNetYOLO(nn.Module):
     def __init__(self, num_classes, num_anchors=9):
         super(LaneVehicleDetectionNetYOLO, self).__init__()
 
-        self.num_anchors = num_anchors
-        self.num_classes = num_classes
-        
+        self.num_anchors = num_anchors # num_anchors: Number of anchor boxes used in the detection head, defaulting to 9.
+        self.num_classes = num_classes # num_classes: Number of object classes that the network will predict (car, truck, bus).
+       
         # Custom backbone network
         self.backbone = CustomBackbone()
         
@@ -137,10 +137,14 @@ class LaneVehicleDetectionNetYOLO(nn.Module):
         # The 1x1 convolutions reduce the number of channels to a uniform size (256) for easier processing.
 
         # Detection head for predicting class scores, bounding boxes, and lane segmentation
+        # Purpose: The detection head predicts the class scores, bounding boxes, and objectness scores for each anchor box.
         self.detection_head = nn.Sequential(
-            nn.Conv2d(256, 512, 3, padding=1),
+            nn.Conv2d(256, 512, 3, padding=1), # A 3x3 convolution that increases the number of channels from 256 to 512 and applies padding of 1 to maintain spatial dimensions.
             nn.ReLU(),
-            nn.Conv2d(512, self.num_anchors * (5 + self.num_classes), 1)  # 5: (4 bounding box coordinates + 1 objectness score)
+            nn.Conv2d(512, self.num_anchors * (5 + self.num_classes), 1)  # A 1x1 convolution that outputs the predictions. 
+            # The number of output channels is self.num_anchors * (5 + self.num_classes):
+            # 5 represents the 4 bounding box coordinates (x, y, width, height) and 1 objectness score.
+            # self.num_classes represents the class scores for each object class.
         )
 
         # Define the lane detection head for semantic segmentation of lanes
