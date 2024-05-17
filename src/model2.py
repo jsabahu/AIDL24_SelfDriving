@@ -136,16 +136,6 @@ class LaneVehicleDetectionNetYOLO(nn.Module):
         # Explanation: The FPN helps in extracting features from different layers of the backbone.
         # The 1x1 convolutions reduce the number of channels to a uniform size (256) for easier processing.
 
-        # Define RoI Align for pooling features from the proposed regions 
-        # MultiScaleRoIAlign is a PyTorch operation used to extract fixed-size feature maps from different levels of a feature pyramid network (FPN) for each region of interest (RoI).  
-        self.roi_align = MultiScaleRoIAlign(featmap_names=['0', '1', '2', '3'], # Feature maps from the FPN layers
-                                            output_size=7, # Output size for RoI align
-                                            sampling_ratio=2) # Sampling ratio for RoI align.
-        # A sampling_ratio of 2 means that for each output pixel, 2x2 sampling points are used to compute the value, enhancing the precision of the RoI alignment.
-        # Explanation: RoI Align pools features from proposed regions into a fixed size (7x7), enabling subsequent classification and regression.
-        # The sampling ratio helps determine the precision of pooling.
-        # output_size=7 in RoI Align: This standard size allows the network to process RoIs consistently, regardless of their original dimensions.
-
         # Detection head for predicting class scores, bounding boxes, and lane segmentation
         self.detection_head = nn.Sequential(
             nn.Conv2d(256, 512, 3, padding=1),
