@@ -55,6 +55,7 @@ class CustomBackbone(nn.Module):
         # self.layer4: A block with 256 input channels and 512 output channels, consisting of 2 layers.
         # The first layer uses a stride of 2 to halve the spatial dimensions, further increasing the depth of the features.
 
+    # Purpose: Dynamically create a block of convolutional layers with batch normalization and ReLU activation.
     def _make_layer(self, in_channels, out_channels, blocks, stride=1):
         layers = []
     
@@ -82,6 +83,8 @@ class CustomBackbone(nn.Module):
 
         # Combine all layers into a sequential module
         return nn.Sequential(*layers)
+    
+
     
     def forward(self, x):
         # Apply the first convolutional layer
