@@ -8,6 +8,18 @@ class CustomBackbone(nn.Module):
     def __init__(self):
         super(CustomBackbone, self).__init__()
 
+        # First convolutional layer: 3 input channels (RGB), 64 output channels, 7x7 kernel, stride 2, padding 3
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3)
+        
+        # Batch normalization for the first convolutional layer
+        self.bn1 = nn.BatchNorm2d(64)
+        
+        # ReLU activation function applied in-place
+        self.relu = nn.ReLU(inplace=True)
+        
+        # Max pooling layer: 3x3 kernel, stride 2, padding 1
+        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+
 class LaneVehicleDetectionNet(nn.Module):
     def __init__(self, num_classes, num_anchors=9 ):
         # num_anchors=9: This is a common choice, providing a sufficient variety of anchor box shapes and sizes to cover different object dimensions.
