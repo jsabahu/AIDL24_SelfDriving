@@ -120,21 +120,18 @@ class LaneVehicleDetectionNetYOLO(nn.Module):
     def __init__(self, num_classes, num_anchors=9):
         super(LaneVehicleDetectionNetYOLO, self).__init__()
 
-        # Number of anchor boxes used in the RPN
         self.num_anchors = num_anchors
+        self.num_classes = num_classes
         
-        # Initialize the backbone network using a pre-trained ResNet50 model, excluding the final classification layers
-        backbone = models.resnet50(pretrained=True) # or False if our DataSet is big enough, which I think so.
-        self.backbone = nn.Sequential(*list(backbone.children())[:-2])
-        # Explanation: ResNet50 is a powerful CNN model pre-trained on ImageNet.
-        # The last two layers are excluded as they are specific to ImageNet classification.
+        # Custom backbone network
+        self.backbone = CustomBackbone()
         
         # Define the Feature Pyramid Network (FPN) to handle multi-scale feature extraction
         self.fpn = nn.ModuleList([
-            nn.Conv2d(2048, 256, 1), # 1x1 convolution to reduce channel dimensions for the topmost feature map
-            nn.Conv2d(1024, 256, 1), # 1x1 convolution for the second feature map
-            nn.Conv2d(512, 256, 1), # 1x1 convolution for the third feature map
-            nn.Conv2d(256, 256, 1), # 1x1 convolution for the fourth feature map
+            nn.Conv2d(512, 256, 1), # 1x1 convolution to reduce channel dimensions for the topmost feature map
+            nn.Conv2d(256, 256, 1), # 1x1 convolution for the second feature map
+            nn.Conv2d(128, 256, 1), # 1x1 convolution for the third feature map
+            nn.Conv2d(64, 256, 1), # 1x1 convolution for the fourth feature map
         ])
         # Explanation: The FPN helps in extracting features from different layers of the backbone.
         # The 1x1 convolutions reduce the number of channels to a uniform size (256) for easier processing.
