@@ -20,6 +20,21 @@ class CustomBackbone(nn.Module):
         # Max pooling layer: 3x3 kernel, stride 2, padding 1
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
 
+        # Define the first block of layers with 64 input channels and 64 output channels, consisting of 2 layers
+        self.layer1 = self._make_layer(64, 64, 2)
+
+        # Define the second block of layers with 64 input channels and 128 output channels, 
+        # a stride of 2 (halving the spatial dimensions), and consisting of 2 layers
+        self.layer2 = self._make_layer(64, 128, 2, stride=2)
+
+        # Define the third block of layers with 128 input channels and 256 output channels, 
+        # a stride of 2 (halving the spatial dimensions), and consisting of 2 layers
+        self.layer3 = self._make_layer(128, 256, 2, stride=2)
+
+        # Define the fourth block of layers with 256 input channels and 512 output channels, 
+        # a stride of 2 (halving the spatial dimensions), and consisting of 2 layers
+        self.layer4 = self._make_layer(256, 512, 2, stride=2)
+
 class LaneVehicleDetectionNet(nn.Module):
     def __init__(self, num_classes, num_anchors=9 ):
         # num_anchors=9: This is a common choice, providing a sufficient variety of anchor box shapes and sizes to cover different object dimensions.
