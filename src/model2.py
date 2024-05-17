@@ -4,6 +4,10 @@ import torch.nn as nn
 import torchvision.models as models
 from torchvision.ops import MultiScaleRoIAlign, RoIPool
 
+class CustomBackbone(nn.Module):
+    def __init__(self):
+        super(CustomBackbone, self).__init__()
+
 class LaneVehicleDetectionNet(nn.Module):
     def __init__(self, num_classes, num_anchors=9 ):
         # num_anchors=9: This is a common choice, providing a sufficient variety of anchor box shapes and sizes to cover different object dimensions.
