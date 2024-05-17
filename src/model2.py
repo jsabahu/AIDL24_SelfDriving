@@ -173,8 +173,15 @@ class LaneVehicleDetectionNetYOLO(nn.Module):
         detection_output = self.detection_head(concatenated_features)
 
         # Reshape the detection output to (N, num_anchors, grid_size, grid_size, (5 + num_classes))
-        N, _, H, W = detection_output.shape
-        detection_output = detection_output.view(N, self.num_anchors, 5 + self.num_classes, H, W).permute(0, 1, 3, 4, 2)
+        N, _, H, W = detection_output.shape # Extracts the dimensions of the detection_output tensor: N (batch size), _ (number of channels, which we don't need directly here), H (height), and W (width).
+        # N is the batch size (number of images in the batch).
+        # C is the number of channels, which is num_anchors * (5 + num_classes).
+        # H is the height of the feature map.
+        # W is the width of the feature map.
+        detection_output = detection_output.view(N, self.num_anchors, 5 + self.num_classes, H, W).permute(0, 1, 3, 4, 2) 
+        # The .view method is used to reshape the detection_output tensor to the shape (N, num_anchors, 5 + self.num_classes, H, W).
+        # The .permute method is used to change the order of dimensions of the tensor.
+        # The new shape of the tensor will be (N, num_anchors, H, W, 5 + self.num_classes).
         
         # Forward pass through the lane detection head for semantic segmentation
         lane_output = self.lane_head(concatenated_features)
