@@ -7,33 +7,53 @@ from torchvision.ops import MultiScaleRoIAlign, RoIPool
 class CustomBackbone(nn.Module):
     def __init__(self):
         super(CustomBackbone, self).__init__()
+        # ---------------------------------------------------------------------------------------------------------
+        # Purpose: Initial processing of the input image to extract basic features and reduce spatial dimensions.
 
         # First convolutional layer: 3 input channels (RGB), 64 output channels, 7x7 kernel, stride 2, padding 3
         self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3)
-        
+        # self.conv1: A convolutional layer that processes the input image (with 3 channels for RGB) to produce 64 feature maps.
+        # The 7x7 kernel size is relatively large, which helps in capturing more context from the input image.
+        # The stride of 2 reduces the spatial dimensions by half.
+
         # Batch normalization for the first convolutional layer
         self.bn1 = nn.BatchNorm2d(64)
+        # self.bn1: Batch normalization is applied to the output of the convolutional layer to normalize the activations.
+        # It helps in stabilizing and speeding up the training process.
         
         # ReLU activation function applied in-place
         self.relu = nn.ReLU(inplace=True)
-        
+        # self.relu: The ReLU activation function introduces non-linearity, which is essential for the network to learn complex patterns.
+
         # Max pooling layer: 3x3 kernel, stride 2, padding 1
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        # self.maxpool: A max pooling layer that further reduces the spatial dimensions by half, with a 3x3 kernel and a stride of 2.
+        # This helps in reducing the computational load and in capturing translation-invariant features.
+        # -------------------------------------------------------------------------------------------------------
+        # Purpose: Create a series of convolutional layers to extract more complex features at multiple scales.
 
         # Define the first block of layers with 64 input channels and 64 output channels, consisting of 2 layers
         self.layer1 = self._make_layer(64, 64, 2)
+        # self.layer1: A block of layers with 64 input and 64 output channels, consisting of 2 layers.
+        # This block maintains the spatial dimensions
 
         # Define the second block of layers with 64 input channels and 128 output channels, 
         # a stride of 2 (halving the spatial dimensions), and consisting of 2 layers
         self.layer2 = self._make_layer(64, 128, 2, stride=2)
+        # self.layer2: A block with 64 input channels and 128 output channels, consisting of 2 layers.
+        # The first layer in this block uses a stride of 2 to halve the spatial dimensions, increasing the depth of the features.
 
         # Define the third block of layers with 128 input channels and 256 output channels, 
         # a stride of 2 (halving the spatial dimensions), and consisting of 2 layers
         self.layer3 = self._make_layer(128, 256, 2, stride=2)
+        # self.layer3: A block with 128 input channels and 256 output channels, consisting of 2 layers.
+        # The first layer uses a stride of 2 to halve the spatial dimensions, further increasing the depth of the features.
 
         # Define the fourth block of layers with 256 input channels and 512 output channels, 
         # a stride of 2 (halving the spatial dimensions), and consisting of 2 layers
         self.layer4 = self._make_layer(256, 512, 2, stride=2)
+        # self.layer4: A block with 256 input channels and 512 output channels, consisting of 2 layers.
+        # The first layer uses a stride of 2 to halve the spatial dimensions, further increasing the depth of the features.
 
     def _make_layer(self, in_channels, out_channels, blocks, stride=1):
         layers = []
@@ -66,28 +86,28 @@ class CustomBackbone(nn.Module):
     def forward(self, x):
         # Apply the first convolutional layer
         x = self.conv1(x)
-        
+
         # Apply batch normalization to the output of the first convolutional layer
         x = self.bn1(x)
-        
+
         # Apply ReLU activation function to introduce non-linearity
         x = self.relu(x)
-        
+
         # Apply max pooling to reduce the spatial dimensions
         x = self.maxpool(x)
-    
+
         # Pass the output through the first block of layers
         x = self.layer1(x)
-        
+
         # Pass the output through the second block of layers
         x = self.layer2(x)
-        
+
         # Pass the output through the third block of layers
         x = self.layer3(x)
-        
+
         # Pass the output through the fourth block of layers
         x = self.layer4(x)
-    
+
         # Return the final output after all layers
         return x
 
