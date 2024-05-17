@@ -162,16 +162,19 @@ class LaneVehicleDetectionNetYOLO(nn.Module):
         fpn_features = [fpn_layer(features) for fpn_layer in self.fpn]
         # Explanation: The backbone features are passed through FPN layers to get multi-scale feature maps, which help in detecting objects of various sizes.
         
-        # Flatten the pooled features and pass through the detection head
-        detection_features = rois.view(rois.size(0), -1)
-        class_logits = self.classifier(detection_features)
-        bbox_preds = self.bbox_regressor(detection_features)
-        # Explanation: The pooled features are flattened and passed through the detection head to produce class logits and bounding box predictions.
+        # Concatenate FPN features (assuming we use the highest level feature map here)
+        concatenated_features = torch.cat(fpn_features, dim=1)
+
+        # Forward pass through the detection head
+        detection_output = self.detection_head(concatenated_features)
+
+        # Reshape the detection output to (N, num_anchors, grid_size, grid_size, (5 + num_classes))
+        N, _, H, W = detection_output.shape
+        detection_output = detection_output.view(N, self.num_anchors, 5 + self.num_classes, H, W).permute(0, 1, 3, 4, 2)
         
         # Forward pass through the lane detection head for semantic segmentation
-        lane_preds = self.lane_head(fpn_features[0])
+        lane_output = self.lane_head(concatenated_features)
         # Explanation: The topmost FPN feature map is used for lane segmentation. The lane detection head processes it to produce a binary mask indicating lanes.
-
         
-        # Return the outputs: class logits, bounding box predictions, and lane predictions
-        return class_logits, bbox_preds, lane_preds
+        # Return the outputs: detection output and lane segmentation
+        return detection_output, lane_output
