@@ -1,19 +1,7 @@
 import os
-from pathlib import Path
 from torch.utils import data
 from PIL import Image
-
-def list_files_in_folder(folder_path):
-    try:
-        # Get a list of all files and directories in the folder
-        files_in_folder = os.listdir(folder_path)
-        # Show only jpg files
-        files = [file for file in files_in_folder if file.lower().endswith('.jpg')]
-        return files
-    except Exception as e:
-        print("Error listing files in folder:", e)
-        return None
-    
+   
 class MyDataset(data.Dataset):
     # Call the super().__init__() method in the __init__.
     def __init__(self, images_path, mask_path, transform=None):
