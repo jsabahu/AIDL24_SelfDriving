@@ -12,7 +12,7 @@ from utils import binary_accuracy_with_logits
 
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
-# Train model one epoch
+# Train model one epoch 
 def train_single_epoch(model, train_loader, optimizer):
     model.train()  # Model in training mode
     accs, losses = [], []  # Init accuracies and losses
