@@ -19,14 +19,20 @@ class Logger(object):
         log_folder = os.path.join(
             pathlib.Path(__file__).parent.parent.resolve(), "logs"
         )
-        file_handler = logging.FileHandler(os.path.join(log_folder, log_file))
-        formatter = logging.Formatter(
-            "%(asctime)s - %(pathname)s[line:%(lineno)d] - %(levelname)s - %(message)s"
-        )
-        file_handler.setFormatter(formatter)
-        self.logger.addHandler(file_handler)
-        console_handler = logging.StreamHandler()  # on-screen output
-        console_handler.setFormatter(formatter)  # Setting the format
+        if not os.path.exists(log_folder):
+            os.makedirs(log_folder)
+
+        if not self.logger.handlers:
+
+            file_handler = logging.FileHandler(os.path.join(log_folder, log_file))
+            formatter = logging.Formatter(
+                "%(asctime)s - %(pathname)s[line:%(lineno)d] - %(levelname)s - %(message)s"
+            )
+            file_handler.setFormatter(formatter)
+            self.logger.addHandler(file_handler)
+            console_handler = logging.StreamHandler()
+            console_handler.setFormatter(formatter)
+            self.logger.addHandler(console_handler)
 
     def log_info(self, message):
         self.logger.info(message)
