@@ -4,9 +4,13 @@ import tarfile
 import shutil
 from pathlib import Path
 import yaml
+import logging
 
 def list_files_in_folder(folder_path):
     try:
+        if not os.path.exists(folder_path):
+            print("Folder does not exist.")
+            return []
         # Get a list of all files and directories in the folder
         files_in_folder = os.listdir(folder_path)
         # Show only jpg files
@@ -30,13 +34,14 @@ def UnZipFolder(file_path, folder_inside, destination_path):
                                       if member.name.startswith(folder_inside)]
                     zip_ref.extractall(path=destination_path, members=folder_members)
                     #Relocate the images to the destination_path
-                    for member in folder_members:
+                    for member in folder_members:                      
                         if os.path.dirname(member.name):
-                            os.rename(os.path.join(destination_path,member.name),
-                                      os.path.join(destination_path,os.path.basename(member.name)))
+                            src = os.path.join(destination_path,member.name)
+                            dst = os.path.join(destination_path,os.path.basename(member.name))
+                            os.rename(src,dst)
                     #Delete empty folder
                     DeleteFolder = os.path.split(Path(folder_inside))
-                    shutil.rmtree(os.path.join("data/images",DeleteFolder[0]))
+                    shutil.rmtree(os.path.join(destination_path,DeleteFolder[0]))
                     print("Unzipped in..." + destination_path)
 
             except Exception as e:
@@ -54,23 +59,18 @@ def UnZipFolder(file_path, folder_inside, destination_path):
                     #Relocate the images to the destination_path
                     for member in folder_members:
                         if os.path.dirname(member.name):
-                            os.rename(os.path.join(destination_path,member.name),
-                                      os.path.join(destination_path,os.path.basename(member.name)))
+                            src = os.path.join(destination_path,member.name)
+                            dst = os.path.join(destination_path,os.path.basename(member.name))
+                            os.rename(src,dst)
                     #Delete empty folder
                     DeleteFolder = os.path.split(Path(folder_inside))
-                    shutil.rmtree(os.path.join("data/images",DeleteFolder[0]))
+                    shutil.rmtree(os.path.join(destination_path,DeleteFolder[0]))
                     print("Unzipped in..." + destination_path)
 
             except Exception as e:
                 print("Error extracting from TAR/TGZ file:", e)
 
 def read_yaml(file_path):
-    """
-    Reads a YAML file and returns its contents as a dictionary.
-    
-    :param file_path: Path to the YAML file.
-    :return: Contents of the YAML file as a dictionary.
-    """
     try:
         with open(file_path, 'r') as file:
             data = yaml.safe_load(file)
@@ -81,3 +81,29 @@ def read_yaml(file_path):
         print(f"Error parsing YAML file: {exc}")
     except Exception as exc:
         print(f"An unexpected error occurred: {exc}")
+
+def config_logger(logfile_path):
+    try:
+        #Config logger
+        logging.basicConfig(
+            filename=logfile_path,  # Log file name
+            level=logging.DEBUG,    # Logging level
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
+        #Use like follows:
+        # logger.debug('message')
+        # logger.info('message')
+        # logger.warning('message')
+        # logger.error('message')
+        # logger.critical('message')
+
+        #Create logger
+        logger = logging.getLogger(__name__)
+        return logger
+    except Exception as exc:
+        print(f"Error configuring logger: {exc}")
+        # Optionally, log the exception details to a fallback log file or stdout
+        logging.basicConfig(level=logging.ERROR)
+        logger = logging.getLogger(__name__)
+        logger.error("Exception occurred", exc_info=True)
+        return None
