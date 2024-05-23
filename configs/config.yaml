@@ -3,6 +3,50 @@
 #   batch_size: 32
 #   num_workers: 4
 #   train_size: 0.8
-# model:
-#   hidden_units: 128
-#   learning_rate: 0.001
+model:
+  hidden_units: 128       # Number of hidden units in certain layers (if applicable)
+  learning_rate: 0.001    # Learning rate for the optimizer
+  input_channels: 3       # Number of input channels (RGB image has 3 channels)
+  num_classes: 3          # Number of object classes to be predicted
+  num_anchors: 9          # Number of anchor boxes used in the detection head
+
+backbone:
+  conv1:
+    out_channels: 64      # Number of output channels for the first convolutional layer
+    kernel_size: 7        # Kernel size for the first convolutional layer
+    stride: 2             # Stride for the first convolutional layer
+    padding: 3            # Padding for the first convolutional layer
+  layer1:
+    in_channels: 64       # Input channels for the first block of layers
+    out_channels: 64      # Output channels for the first block of layers
+    blocks: 2             # Number of layers in the first block
+  layer2:
+    in_channels: 64       # Input channels for the second block of layers
+    out_channels: 128     # Output channels for the second block of layers
+    blocks: 2             # Number of layers in the second block
+    stride: 2             # Stride for the first layer in the second block
+  layer3:
+    in_channels: 128      # Input channels for the third block of layers
+    out_channels: 256     # Output channels for the third block of layers
+    blocks: 2             # Number of layers in the third block
+    stride: 2             # Stride for the first layer in the third block
+  layer4:
+    in_channels: 256      # Input channels for the fourth block of layers
+    out_channels: 512     # Output channels for the fourth block of layers
+    blocks: 2             # Number of layers in the fourth block
+    stride: 2             # Stride for the first layer in the fourth block
+
+fpn:
+  channels: 256           # Number of output channels for each FPN layer
+
+detection_head:
+  intermediate_channels: 512 # Number of intermediate channels in the detection head
+  kernel_size: 3              # Kernel size for the intermediate convolutional layer
+  padding: 1                  # Padding for the intermediate convolutional layer
+
+lane_head:
+  intermediate_channels1: 128 # Number of intermediate channels for the first convolutional layer in the lane head
+  intermediate_channels2: 64  # Number of intermediate channels for the second convolutional layer in the lane head
+  kernel_size: 3              # Kernel size for the convolutional layers in the lane head
+  padding: 1                  # Padding for the convolutional layers in the lane head
+  output_channels: 1          # Number of output channels for the final convolutional layer in the lane head
