@@ -9,4 +9,4 @@
 batch_size: 64
 images_path: "data\\images"
 mask_path: "data\\mask"
-log_filename: 'logs\\app.log'
+log_filename: 'app.log'

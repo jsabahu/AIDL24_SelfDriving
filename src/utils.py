@@ -1,10 +1,16 @@
+import torch
 import os
 import zipfile
 import tarfile
 import shutil
 from pathlib import Path
 import yaml
-import logging
+
+# Function use in train
+def binary_accuracy_with_logits(labels, outputs):
+    preds = torch.sigmoid(outputs).round()
+    acc = (preds == labels.view_as(preds)).float().detach().numpy().mean()
+    return acc
 
 def list_files_in_folder(folder_path):
     try:
@@ -81,29 +87,3 @@ def read_yaml(file_path):
         print(f"Error parsing YAML file: {exc}")
     except Exception as exc:
         print(f"An unexpected error occurred: {exc}")
-
-def config_logger(logfile_path):
-    try:
-        #Config logger
-        logging.basicConfig(
-            filename=logfile_path,  # Log file name
-            level=logging.DEBUG,    # Logging level
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
-        #Use like follows:
-        # logger.debug('message')
-        # logger.info('message')
-        # logger.warning('message')
-        # logger.error('message')
-        # logger.critical('message')
-
-        #Create logger
-        logger = logging.getLogger(__name__)
-        return logger
-    except Exception as exc:
-        print(f"Error configuring logger: {exc}")
-        # Optionally, log the exception details to a fallback log file or stdout
-        logging.basicConfig(level=logging.ERROR)
-        logger = logging.getLogger(__name__)
-        logger.error("Exception occurred", exc_info=True)
-        return None
