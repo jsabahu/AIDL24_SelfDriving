@@ -9,6 +9,12 @@ from model import Model1  # Will define correct model name
 from dataloader import MyDataset
 from hyperparameters import hparams
 from utils import binary_accuracy_with_logits
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+
+
 
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
@@ -50,9 +56,16 @@ def train_model(hparams):
     # Initialize optimizer (possibility to create specific optimizer call from utils)
     # Self-drive examples found use the Adam optimizer
     optimizer = optim.Adam(model.parameters(), lr=hparams['learning_rate'],weight_decay=hparams['weight_decay']) #Note use weight_decay to prevent overfitting
+    #Initialize best_loss
+    best_loss = float('inf')  # Inicialitzar best_loss
 
     for epoch in range(hparams['num_epochs']):  
         # Train model for 1 epoch
         train_loss, train_acc = train_single_epoch(model, train_loader, optimizer)
-        print(f"Train Epoch {epoch} loss={train_loss:.2f} acc={train_acc:.2f}")
+        logging.info(f"Train Epoch {epoch} loss={train_loss:.2f} acc={train_acc:.2f}")
+        #Save best lost
+        if train_loss < best_loss:
+            best_loss = train_loss
+            torch.save(model.state_dict(), 'best_model.pth')
+            logging.info(f"Saved best model with loss {best_loss:.2f}")
     return model
