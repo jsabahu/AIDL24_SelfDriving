@@ -78,7 +78,8 @@ class CustomBackbone(nn.Module):
         x = self.layer3(x)
         x = self.layer4(x)
         return x
-
+    
+# Feature Pyramid Network Definition
 class FeaturePyramidNetwork(nn.Module):
     def __init__(self, backbone_out_channels):
         super(FeaturePyramidNetwork, self).__init__()
@@ -106,4 +107,12 @@ class FeaturePyramidNetwork(nn.Module):
         p1 = self.smooth1(p1)
         
         return p1, p2, p3, p4
-    
+
+# RoI Align Layer
+class RoIAlignLayer(nn.Module):
+    def __init__(self, output_size):
+        super(RoIAlignLayer, self).__init__()
+        self.roi_align = RoIAlign(output_size, spatial_scale=1.0, sampling_ratio=2)
+
+    def forward(self, features, rois):
+        return self.roi_align(features, rois)
