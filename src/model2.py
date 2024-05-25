@@ -136,3 +136,110 @@ class SemanticLaneHead(nn.Module):
         x = F.relu(self.deconv(x))
         x = self.mask_fcn_logits(x)
         return x
+    
+# Model Integration
+class LaneDetectionModel(nn.Module):
+    def __init__(self, config):
+        super(LaneDetectionModel, self).__init__()
+        self.backbone = CustomBackbone(config)
+        backbone_out_channels = [
+            config['backbone']['layer1']['out_channels'],
+            config['backbone']['layer2']['out_channels'],
+            config['backbone']['layer3']['out_channels'],
+            config['backbone']['layer4']['out_channels']
+        ]
+        self.fpn = FeaturePyramidNetwork(backbone_out_channels)
+        self.roi_align = RoIAlignLayer(output_size=(14, 14))
+        self.mask_head = SemanticLaneHead(in_channels=256, num_classes=config['model']['num_classes'])
+
+    def forward(self, images, rois):
+        features = self.backbone(images)
+        pyramid_features = self.fpn(features)
+        aligned_features = self.roi_align(pyramid_features, rois)
+        mask_logits = self.mask_head(aligned_features)
+        return mask_logits
+    
+    
+""" # Dataset and DataLoader Definitions
+class BDD100KDataset(Dataset):
+    def __init__(self, root, transforms):
+        self.root = root
+        self.transforms = transforms
+        self.imgs = list(sorted(os.listdir(os.path.join(root, "images"))))
+        self.masks = list(sorted(os.listdir(os.path.join(root, "masks"))))
+    
+    def __getitem__(self, idx):
+        img_path = os.path.join(self.root, "images", self.imgs[idx])
+        mask_path = os.path.join(self.root, "masks", self.masks[idx])
+        img = Image.open(img_path).convert("RGB")
+        mask = Image.open(mask_path)
+        
+        mask = np.array(mask)
+        mask = mask.astype(np.uint8)
+        masks = torch.as_tensor(mask, dtype=torch.uint8)
+        
+        target = {}
+        target["masks"] = masks.unsqueeze(0)
+        
+        if self.transforms is not None:
+            img, target = self.transforms(img, target)
+        
+        return img, target
+    
+    def __len__(self):
+        return len(self.imgs)
+
+def get_transform(train):
+    transforms = []
+    transforms.append(ToTensor())
+    if train:
+        transforms.append(RandomHorizontalFlip(0.5))
+    return Compose(transforms)
+
+# Load Configuration
+def load_config(config_path):
+    with open(config_path, 'r') as file:
+        config = yaml.safe_load(file)
+    return config
+
+# Example of Usage
+def main():
+    config_path = 'config.yaml'
+    config = load_config(config_path)
+
+    dataset = BDD100KDataset(root='data/bdd100k', transforms=get_transform(train=True))
+    dataset_test = BDD100KDataset(root='data/bdd100k', transforms=get_transform(train=False))
+
+    data_loader = DataLoader(dataset, batch_size=config['dataloader']['batch_size'], shuffle=True, num_workers=config['dataloader']['num_workers'])
+    data_loader_test = DataLoader(dataset_test, batch_size=1, shuffle=False, num_workers=config['dataloader']['num_workers'])
+
+    model = LaneDetectionModel(config)
+    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+    model.to(device)
+
+    params = [p for p in model.parameters() if p.requires_grad]
+    optimizer = optim.SGD(params, lr=config['model']['learning_rate'], momentum=0.9, weight_decay=0.0005)
+    lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
+
+    num_epochs = 10
+    for epoch in range(num_epochs):
+        model.train()
+        for images, targets in data_loader:
+            images = list(image.to(device) for image in images)
+            targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
+            
+            loss_dict = model(images, targets)
+            losses = sum(loss for loss in loss_dict.values())
+
+            optimizer.zero_grad()
+            losses.backward()
+            optimizer.step()
+
+        lr_scheduler.step()
+
+        # Add evaluation logic here
+
+    torch.save(model.state_dict(), 'lane_detection_model.pth')
+
+if __name__ == "__main__":
+    main() """
