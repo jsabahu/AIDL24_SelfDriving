@@ -60,3 +60,4 @@ lane_head:
   kernel_size: 3              # Kernel size for the convolutional layers in the lane head
   padding: 1                  # Padding for the convolutional layers in the lane head
   output_channels: 1          # Number of output channels for the final convolutional layer in the lane head
+  
