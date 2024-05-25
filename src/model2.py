@@ -1,6 +1,14 @@
+import yaml
 import torch
 import torch.nn as nn
-import yaml
+import torch.optim as optim
+import torch.nn.functional as F
+from torch.utils.data import DataLoader, Dataset
+from torchvision.ops import RoIAlign
+import os
+from PIL import Image
+import numpy as np
+from torchvision.transforms import ToTensor, Compose, RandomHorizontalFlip
 
 # Load hyperparameters from config file
 with open('configs/config.yaml', 'r') as file:
@@ -71,48 +79,31 @@ class CustomBackbone(nn.Module):
         x = self.layer4(x)
         return x
 
-class LaneVehicleDetectionNetYOLO(nn.Module):
-    def __init__(self):
-        super(LaneVehicleDetectionNetYOLO, self).__init__()
+class FeaturePyramidNetwork(nn.Module):
+    def __init__(self, backbone_out_channels):
+        super(FeaturePyramidNetwork, self).__init__()
+        self.lateral4 = nn.Conv2d(backbone_out_channels[3], 256, kernel_size=1)
+        self.lateral3 = nn.Conv2d(backbone_out_channels[2], 256, kernel_size=1)
+        self.lateral2 = nn.Conv2d(backbone_out_channels[1], 256, kernel_size=1)
+        self.lateral1 = nn.Conv2d(backbone_out_channels[0], 256, kernel_size=1)
+        
+        self.smooth4 = nn.Conv2d(256, 256, kernel_size=3, padding=1)
+        self.smooth3 = nn.Conv2d(256, 256, kernel_size=3, padding=1)
+        self.smooth2 = nn.Conv2d(256, 256, kernel_size=3, padding=1)
+        self.smooth1 = nn.Conv2d(256, 256, kernel_size=3, padding=1)
 
-        self.num_anchors = config['model']['num_anchors']
-        self.num_classes = config['model']['num_classes']
-       
-        self.backbone = CustomBackbone()
-        
-        self.fpn = nn.ModuleList([
-            nn.Conv2d(config['backbone']['layer4']['out_channels'], config['fpn']['channels'], 1),
-            nn.Conv2d(config['backbone']['layer3']['out_channels'], config['fpn']['channels'], 1),
-            nn.Conv2d(config['backbone']['layer2']['out_channels'], config['fpn']['channels'], 1),
-            nn.Conv2d(config['backbone']['layer1']['out_channels'], config['fpn']['channels'], 1),
-        ])
-        
-        self.detection_head = nn.Sequential(
-            nn.Conv2d(config['fpn']['channels'], config['detection_head']['intermediate_channels'], config['detection_head']['kernel_size'], padding=config['detection_head']['padding']),
-            nn.ReLU(),
-            nn.Conv2d(config['detection_head']['intermediate_channels'], self.num_anchors * (5 + self.num_classes), 1)
-        )
+    def forward(self, x):
+        c1, c2, c3, c4 = x
 
-        self.lane_head = nn.Sequential(
-            nn.Conv2d(config['fpn']['channels'], config['lane_head']['intermediate_channels1'], config['lane_head']['kernel_size'], padding=config['lane_head']['padding']),
-            nn.ReLU(),
-            nn.Conv2d(config['lane_head']['intermediate_channels1'], config['lane_head']['intermediate_channels2'], config['lane_head']['kernel_size'], padding=config['lane_head']['padding']),
-            nn.ReLU(),
-            nn.Conv2d(config['lane_head']['intermediate_channels2'], config['lane_head']['output_channels'], 1)
-        )
+        p4 = self.lateral4(c4)
+        p3 = self.lateral3(c3) + F.interpolate(p4, scale_factor=2, mode="nearest")
+        p2 = self.lateral2(c2) + F.interpolate(p3, scale_factor=2, mode="nearest")
+        p1 = self.lateral1(c1) + F.interpolate(p2, scale_factor=2, mode="nearest")
 
-    def forward(self, images, targets=None):
-        features = self.backbone(images)
+        p4 = self.smooth4(p4)
+        p3 = self.smooth3(p3)
+        p2 = self.smooth2(p2)
+        p1 = self.smooth1(p1)
         
-        fpn_features = [fpn_layer(features) for fpn_layer in self.fpn]
-        
-        concatenated_features = torch.cat(fpn_features, dim=1)
-
-        detection_output = self.detection_head(concatenated_features)
-
-        N, _, H, W = detection_output.shape
-        detection_output = detection_output.view(N, self.num_anchors, 5 + self.num_classes, H, W).permute(0, 1, 3, 4, 2)
-        
-        lane_output = self.lane_head(concatenated_features)
-        
-        return detection_output, lane_output
+        return p1, p2, p3, p4
+    
