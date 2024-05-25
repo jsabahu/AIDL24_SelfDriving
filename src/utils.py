@@ -6,6 +6,7 @@ import shutil
 from pathlib import Path
 import yaml
 
+
 # Function use in train
 def binary_accuracy_with_logits(labels, outputs):
     preds = torch.sigmoid(outputs).round()
@@ -87,3 +88,4 @@ def read_yaml(file_path):
         print(f"Error parsing YAML file: {exc}")
     except Exception as exc:
         print(f"An unexpected error occurred: {exc}")
+
