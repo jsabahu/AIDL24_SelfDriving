@@ -1,5 +1,4 @@
 import torch
-<<<<<<< HEAD
 import os
 import zipfile
 import tarfile
