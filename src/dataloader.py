@@ -43,5 +43,5 @@ class MyDataset(data.Dataset):
         mask = mask.flatten() 
         
         # Convert tensor to binary tensor
-        mask = torch.where(mask > 125, torch.tensor(1), torch.tensor(0)).float()
+        mask = torch.where(mask > 0.5, torch.tensor(1), torch.tensor(0)).float()
         return image, mask
