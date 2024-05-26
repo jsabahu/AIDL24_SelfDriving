@@ -24,5 +24,4 @@ data/
 logs/
 models/
 runs/
-
 *.pth
