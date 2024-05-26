@@ -15,15 +15,16 @@ class MyDataset(Dataset):
 
         # Resolve the root folder
         self.root_folder = pathlib.Path(__file__).parent.parent
-        
+
         # Set paths for images and masks
         self.images_path = os.path.join(self.root_folder, images_path)
         self.mask_path = os.path.join(self.root_folder, mask_path)
         self.transform = transform
 
         # List all files in the images directory and filter for jpg files
-        self.image_files = sorted([f for f in os.listdir(self.images_path) if f.lower().endswith(".jpg")])
-
+        self.image_files = sorted(
+            [f for f in os.listdir(self.images_path) if f.lower().endswith(".jpg")]
+        )
 
     def __len__(self):
         return len(self.image_files)
@@ -35,7 +36,7 @@ class MyDataset(Dataset):
         # Get the image file name and construct the full path
         image_name = self.image_files[index]
         image_path = os.path.join(self.images_path, image_name)
-        
+
         # Assume the mask has the same base name but with a .png extension
         mask_name = f"{os.path.splitext(image_name)[0]}.png"
         mask_path = os.path.join(self.mask_path, mask_name)
@@ -52,7 +53,8 @@ class MyDataset(Dataset):
         mask = (mask == 1).type(torch.int)
 
         return image, mask
-    
+
+
 if __name__ == "__main__":
     # Example usage:
     config_path = "configs/config.yaml"
@@ -62,12 +64,16 @@ if __name__ == "__main__":
 
     my_transforms = transforms.Compose(
         [
-            #transforms.Resize((256, 256), antialias=True),
+            # transforms.Resize((256, 256), antialias=True),
             transforms.ToTensor(),
         ]
     )
     # Initialize the dataset and dataloader
-    dataset = MyDataset(images_path=config["train"]["train_images_path"],mask_path=config["train"]["train_labels_path"], transform=my_transforms)
+    dataset = MyDataset(
+        images_path=config["train"]["train_images_path"],
+        mask_path=config["train"]["train_labels_path"],
+        transform=my_transforms,
+    )
     dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
 
     # Retrieve one batch of data
@@ -97,18 +103,17 @@ if __name__ == "__main__":
 
     # Convert the tensors to numpy arrays for plotting
     image_np = image.numpy().transpose(1, 2, 0)  # Convert to HWC format for plotting
-    mask_np = mask.numpy().squeeze()             # Remove the channel dimension for the mask
+    mask_np = mask.numpy().squeeze()  # Remove the channel dimension for the mask
 
     # Plot the image and mask
     fig, axes = plt.subplots(1, 2, figsize=(10, 5))
 
     axes[0].imshow(image_np)
-    axes[0].set_title('Image')
-    axes[0].axis('off')
+    axes[0].set_title("Image")
+    axes[0].axis("off")
 
-    axes[1].imshow(mask_np, cmap='gray')
-    axes[1].set_title('Mask')
-    axes[1].axis('off')
+    axes[1].imshow(mask_np, cmap="gray")
+    axes[1].set_title("Mask")
+    axes[1].axis("off")
 
     plt.show()
-
