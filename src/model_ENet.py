@@ -1,6 +1,9 @@
 # Source: https://github.com/davidtvs/PyTorch-ENet/blob/master/models/enet.py
 import torch
 import torch.nn as nn
+from typing import Tuple
+
+# TODO add hyperparameters handler
 
 
 class InitialBlock(nn.Module):
@@ -13,7 +16,7 @@ class InitialBlock(nn.Module):
     outputs 13 feature maps while the extension branch outputs 3, for a
     total of 16 feature maps after concatenation."""
 
-    def __init__(self, in_channels, out_channels, relu=True):
+    def __init__(self, in_channels: int, out_channels: int, relu: bool = True):
         super().__init__()
         activation = nn.ReLU if relu else nn.PReLU
 
@@ -29,7 +32,7 @@ class InitialBlock(nn.Module):
         self.batch_norm = nn.BatchNorm2d(out_channels)
         self.out_activation = activation()
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         main = self.main_branch(x)
         ext = self.ext_branch(x)
         out = torch.cat((main, ext), 1)
@@ -52,14 +55,14 @@ class RegularBottleneck(nn.Module):
 
     def __init__(
         self,
-        channels,
-        internal_ratio=4,
-        kernel_size=3,
-        padding=0,
-        dilation=1,
-        asymmetric=False,
-        dropout_prob=0,
-        relu=True,
+        channels: int,
+        internal_ratio: int = 4,
+        kernel_size: int = 3,
+        padding: int = 0,
+        dilation: int = 1,
+        asymmetric: bool = False,
+        dropout_prob: float = 0,
+        relu: bool = True,
     ):
         super().__init__()
         # Check internal_scale parameter is inside range [1, channels]
@@ -136,7 +139,7 @@ class RegularBottleneck(nn.Module):
         self.ext_regul = nn.Dropout2d(p=dropout_prob)
         self.out_activation = activation()
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         main = x
         ext = self.ext_conv1(x)
         ext = self.ext_conv2(ext)
@@ -163,12 +166,12 @@ class DownsamplingBottleneck(nn.Module):
 
     def __init__(
         self,
-        in_channels,
-        out_channels,
-        internal_ratio=4,
-        return_indices=False,
-        dropout_prob=0,
-        relu=True,
+        in_channels: int,
+        out_channels: int,
+        internal_ratio: int = 4,
+        return_indices: bool = False,
+        dropout_prob: float = 0,
+        relu: bool = True,
     ):
         super().__init__()
 
@@ -226,7 +229,7 @@ class DownsamplingBottleneck(nn.Module):
         self.ext_regul = nn.Dropout2d(p=dropout_prob)
         self.out_activation = activation()
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         # Main branch shortcut
         if self.return_indices:
             main, max_indices = self.main_max1(x)
@@ -277,7 +280,12 @@ class UpsamplingBottleneck(nn.Module):
     4. dropout as a regularizer."""
 
     def __init__(
-        self, in_channels, out_channels, internal_ratio=4, dropout_prob=0, relu=True
+        self,
+        in_channels: int,
+        out_channels: int,
+        internal_ratio: int = 4,
+        dropout_prob: float = 0,
+        relu: bool = True,
     ):
         super().__init__()
 
@@ -328,7 +336,9 @@ class UpsamplingBottleneck(nn.Module):
         self.ext_regul = nn.Dropout2d(p=dropout_prob)
         self.out_activation = activation()
 
-    def forward(self, x, max_indices, output_size):
+    def forward(
+        self, x: torch.Tensor, max_indices: torch.Tensor, output_size: torch.Size
+    ) -> torch.Tensor:
         # Main branch shortcut
         main = self.main_conv1(x)
         main = self.main_unpool1(main, max_indices, output_size=output_size)
@@ -349,7 +359,9 @@ class UpsamplingBottleneck(nn.Module):
 class ENet(nn.Module):
     """Generate the ENet model."""
 
-    def __init__(self, num_classes, encoder_relu=False, decoder_relu=True):
+    def __init__(
+        self, num_classes: int, encoder_relu: bool = False, decoder_relu: bool = True
+    ):
         super().__init__()
         self.initial_block = InitialBlock(3, 16, relu=encoder_relu)
 
@@ -389,7 +401,7 @@ class ENet(nn.Module):
             16, num_classes, kernel_size=3, stride=2, padding=1, bias=False
         )
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         # Initial block
         input_size = x.size()
         x = self.initial_block(x)
