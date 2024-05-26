@@ -12,7 +12,7 @@ dataloader:
   images_path: "data\\images"
   mask_path: "data\\mask"
   log_filename: 'app.log'
-  
+
 model:
   hidden_units: 128       # Number of hidden units in certain layers (if applicable)
   learning_rate: 0.001    # Learning rate for the optimizer
@@ -60,4 +60,10 @@ lane_head:
   kernel_size: 3              # Kernel size for the convolutional layers in the lane head
   padding: 1                  # Padding for the convolutional layers in the lane head
   output_channels: 1          # Number of output channels for the final convolutional layer in the lane head
-  
+
+train:
+  train_images_path: "data/bdd100k/images/100k/train"
+  train_labels_path: "data/bdd100k/labels/lane/masks/train"
+
+main:
+  log_filename: "main.log"
