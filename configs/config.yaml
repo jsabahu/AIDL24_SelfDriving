@@ -64,6 +64,7 @@ lane_head:
 train:
   train_images_path: "data/bdd100k/images/100k/train"
   train_labels_path: "data/bdd100k/labels/lane/masks/train"
+  model_name: "Lane_Model_ENet"
 
 main:
   log_filename: "main.log"
