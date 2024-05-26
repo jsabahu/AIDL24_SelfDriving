@@ -24,9 +24,9 @@ scipy==1.10.1
 six==1.16.0
 sympy==1.11.1
 tensorboard
-torch==2.0.0+cpu
-torchaudio==2.0.1+cpu
-torchvision==0.15.1+cpu
+torch==2.0.0
+torchaudio==2.0.1
+torchvision==0.15.1
 typing_extensions==4.4.0
 urllib3==1.26.13
 virtualenv==20.26.2
