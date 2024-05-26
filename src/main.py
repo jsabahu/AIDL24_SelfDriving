@@ -6,28 +6,30 @@ from utils import read_yaml
 from logger import Logger
 from train import train_model
 from utils import save_model
+from pathlib import Path
+
+logger = Logger()
 
 
 def main():
+    # Define hyperparameters
     hparams = {
         "batch_size": 64,
         "learning_rate": 0.05,
         "weight_decay": 0.1,
         "num_epochs": 5,
     }
-    # Parameters to use
-    config_path = "configs/config.yaml"
-    config = read_yaml(config_path)
 
-    # Create a logger object
-    logger = Logger(log_file=config["main"]["log_filename"], level="debug")
+    # Read configuration
+    config_path = "configs/config.yaml"
+    try:
+        config = read_yaml(config_path)
+        logger.log_debug(f"Read configuration from {config_path}")
+    except Exception as e:
+        logger.log_error(f"Failed to read configuration from {config_path}: {e}")
+        raise
 
     my_model = train_model(hparams=hparams)
-    model_name = "test"
-
-    save_model(
-        model=my_model, model_name=model_name, path=config["main"]["saving_path"]
-    )
 
 
 if __name__ == "__main__":

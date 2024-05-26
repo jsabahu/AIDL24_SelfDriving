@@ -169,10 +169,11 @@ def train_model(hparams):
 
         # Save best model
         if train_loss < best_loss:
+            best_model = model
             best_loss = train_loss
-            save_model(model, config["train"]["model_name"])
-            logger.log_debug(f"Saved best model with loss {best_loss:.2f}")
+            save_model(best_model, config["train"]["model_name"])
+            logger.log_debug(f"Saved best model with loss {best_loss:.2f} ")
 
     writer.flush()
     logger.log_debug("Training completed")
-    return model
+    return best_model

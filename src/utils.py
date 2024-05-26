@@ -167,4 +167,4 @@ def save_model(model: torch.nn.Module, model_name: str):
     save_folder.mkdir(parents=True, exist_ok=True)
     filepath = save_folder / model_name
     torch.save(model.state_dict(), filepath)
-    logger.log_error(f"Model saved at {filepath}")
+    logger.log_debug(f"Model saved at {filepath}")
