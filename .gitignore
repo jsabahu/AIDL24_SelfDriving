@@ -1,4 +1,3 @@
-/data/PennFudanPed/*
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -25,3 +24,5 @@ data/
 logs/
 models/
 runs/
+
+*.pth
