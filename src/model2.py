@@ -81,17 +81,17 @@ class CustomBackbone(nn.Module):
     
 # Feature Pyramid Network Definition
 class FeaturePyramidNetwork(nn.Module):
-    def __init__(self, backbone_out_channels):
+    def __init__(self, config, backbone_out_channels):
         super(FeaturePyramidNetwork, self).__init__()
-        self.lateral4 = nn.Conv2d(backbone_out_channels[3], 256, kernel_size=1)
-        self.lateral3 = nn.Conv2d(backbone_out_channels[2], 256, kernel_size=1)
-        self.lateral2 = nn.Conv2d(backbone_out_channels[1], 256, kernel_size=1)
-        self.lateral1 = nn.Conv2d(backbone_out_channels[0], 256, kernel_size=1)
+        self.lateral4 = nn.Conv2d(backbone_out_channels[3], config['fpn']['lateral']['out_channels'], kernel_size=1)
+        self.lateral3 = nn.Conv2d(backbone_out_channels[2], config['fpn']['lateral']['out_channels'], kernel_size=1)
+        self.lateral2 = nn.Conv2d(backbone_out_channels[1], config['fpn']['lateral']['out_channels'], kernel_size=1)
+        self.lateral1 = nn.Conv2d(backbone_out_channels[0], config['fpn']['lateral']['out_channels'], kernel_size=1)
         
-        self.smooth4 = nn.Conv2d(256, 256, kernel_size=3, padding=1)
-        self.smooth3 = nn.Conv2d(256, 256, kernel_size=3, padding=1)
-        self.smooth2 = nn.Conv2d(256, 256, kernel_size=3, padding=1)
-        self.smooth1 = nn.Conv2d(256, 256, kernel_size=3, padding=1)
+        self.smooth4 = nn.Conv2d(config['fpn']['lateral']['out_channels'], config['fpn']['smooth']['out_channels'], kernel_size=config['fpn']['smooth']['kernel_size'], padding=config['fpn']['smooth']['padding'])
+        self.smooth3 = nn.Conv2d(config['fpn']['lateral']['out_channels'], config['fpn']['smooth']['out_channels'], kernel_size=config['fpn']['smooth']['kernel_size'], padding=config['fpn']['smooth']['padding'])
+        self.smooth2 = nn.Conv2d(config['fpn']['lateral']['out_channels'], config['fpn']['smooth']['out_channels'], kernel_size=config['fpn']['smooth']['kernel_size'], padding=config['fpn']['smooth']['padding'])
+        self.smooth1 = nn.Conv2d(config['fpn']['lateral']['out_channels'], config['fpn']['smooth']['out_channels'], kernel_size=config['fpn']['smooth']['kernel_size'], padding=config['fpn']['smooth']['padding'])
 
     def forward(self, x):
         c1, c2, c3, c4 = x
@@ -107,26 +107,28 @@ class FeaturePyramidNetwork(nn.Module):
         p1 = self.smooth1(p1)
         
         return p1, p2, p3, p4
-
+    
 # RoI Align Layer
 class RoIAlignLayer(nn.Module):
-    def __init__(self, output_size):
+    def __init__(self, config):
         super(RoIAlignLayer, self).__init__()
-        self.roi_align = RoIAlign(output_size, spatial_scale=1.0, sampling_ratio=2)
+        self.roi_align = RoIAlign(config['roi_align']['output_size'], spatial_scale=config['roi_align']['spatial_scale'], sampling_ratio=config['roi_align']['sampling_ratio'])
 
     def forward(self, features, rois):
         return self.roi_align(features, rois)
 
 # Semantic Lane Head
 class SemanticLaneHead(nn.Module):
-    def __init__(self, in_channels, num_classes):
+    def __init__(self, config):
         super(SemanticLaneHead, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels, 256, kernel_size=3, padding=1)
-        self.conv2 = nn.Conv2d(256, 256, kernel_size=3, padding=1)
-        self.conv3 = nn.Conv2d(256, 256, kernel_size=3, padding=1)
-        self.conv4 = nn.Conv2d(256, 256, kernel_size=3, padding=1)
-        self.deconv = nn.ConvTranspose2d(256, 256, kernel_size=2, stride=2)
-        self.mask_fcn_logits = nn.Conv2d(256, num_classes, kernel_size=1)
+        in_channels = config['semantic_lane_head']['in_channels']
+        num_classes = config['model']['num_classes']
+        self.conv1 = nn.Conv2d(in_channels, config['semantic_lane_head']['conv']['out_channels'], kernel_size=config['semantic_lane_head']['conv']['kernel_size'], padding=config['semantic_lane_head']['conv']['padding'])
+        self.conv2 = nn.Conv2d(config['semantic_lane_head']['conv']['out_channels'], config['semantic_lane_head']['conv']['out_channels'], kernel_size=config['semantic_lane_head']['conv']['kernel_size'], padding=config['semantic_lane_head']['conv']['padding'])
+        self.conv3 = nn.Conv2d(config['semantic_lane_head']['conv']['out_channels'], config['semantic_lane_head']['conv']['out_channels'], kernel_size=config['semantic_lane_head']['conv']['kernel_size'], padding=config['semantic_lane_head']['conv']['padding'])
+        self.conv4 = nn.Conv2d(config['semantic_lane_head']['conv']['out_channels'], config['semantic_lane_head']['conv']['out_channels'], kernel_size=config['semantic_lane_head']['conv']['kernel_size'], padding=config['semantic_lane_head']['conv']['padding'])
+        self.deconv = nn.ConvTranspose2d(config['semantic_lane_head']['deconv']['out_channels'], config['semantic_lane_head']['deconv']['out_channels'], kernel_size=config['semantic_lane_head']['deconv']['kernel_size'], stride=config['semantic_lane_head']['deconv']['stride'])
+        self.mask_fcn_logits = nn.Conv2d(config['semantic_lane_head']['deconv']['out_channels'], num_classes, kernel_size=config['semantic_lane_head']['mask_fcn_logits']['kernel_size'])
 
     def forward(self, x):
         x = F.relu(self.conv1(x))
@@ -148,9 +150,9 @@ class LaneDetectionModel(nn.Module):
             config['backbone']['layer3']['out_channels'],
             config['backbone']['layer4']['out_channels']
         ]
-        self.fpn = FeaturePyramidNetwork(backbone_out_channels)
-        self.roi_align = RoIAlignLayer(output_size=(14, 14))
-        self.mask_head = SemanticLaneHead(in_channels=256, num_classes=config['model']['num_classes'])
+        self.fpn = FeaturePyramidNetwork(backbone_out_channels, config)
+        self.roi_align = RoIAlignLayer(config)
+        self.mask_head = SemanticLaneHead(config)
 
     def forward(self, images, rois):
         features = self.backbone(images)

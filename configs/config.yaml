@@ -36,7 +36,33 @@ backbone:
     blocks: 2             # Number of layers in the fourth block
     stride: 2             # Stride for the first layer in the fourth block
 
+fpn:
+  lateral:
+    out_channels: 256     # Number of output channels for the lateral layers
+  smooth:
+    out_channels: 256     # Number of output channels for the smooth layers
+    kernel_size: 3        # Kernel size for the smooth layers
+    padding: 1            # Padding for the smooth layers
 
+roi_align:
+  output_size: 14         # Output size for the RoI Align layer
+  spatial_scale: 1.0      # Spatial scale for the RoI Align layer
+  sampling_ratio: 2       # Sampling ratio for the RoI Align layer
+
+
+semantic_lane_head:
+  in_channels: 256        # Input channels for the semantic lane head
+  conv:
+    out_channels: 256     # Output channels for the convolutional layers
+    kernel_size: 3        # Kernel size for the convolutional layers
+    padding: 1            # Padding for the convolutional layers
+  deconv:
+    out_channels: 256     # Output channels for the deconvolutional layer
+    kernel_size: 2        # Kernel size for the deconvolutional layer
+    stride: 2             # Stride for the deconvolutional layer
+  mask_fcn_logits:
+    kernel_size: 1        # Kernel size for the final mask prediction layer
+    
 dataloader:
   batch_size: 64
   images_path: "data\\images"
