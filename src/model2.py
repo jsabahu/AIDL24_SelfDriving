@@ -85,80 +85,6 @@ class CustomBackbone(nn.Module):
         x = self.layer3(x)
         x = self.layer4(x)
         return x
-<<<<<<< HEAD
-
-
-class LaneVehicleDetectionNetYOLO(nn.Module):
-    def __init__(self):
-        super(LaneVehicleDetectionNetYOLO, self).__init__()
-
-        self.num_anchors = config["model"]["num_anchors"]
-        self.num_classes = config["model"]["num_classes"]
-
-        self.backbone = CustomBackbone()
-
-        self.fpn = nn.ModuleList(
-            [
-                nn.Conv2d(
-                    config["backbone"]["layer4"]["out_channels"],
-                    config["fpn"]["channels"],
-                    1,
-                ),
-                nn.Conv2d(
-                    config["backbone"]["layer3"]["out_channels"],
-                    config["fpn"]["channels"],
-                    1,
-                ),
-                nn.Conv2d(
-                    config["backbone"]["layer2"]["out_channels"],
-                    config["fpn"]["channels"],
-                    1,
-                ),
-                nn.Conv2d(
-                    config["backbone"]["layer1"]["out_channels"],
-                    config["fpn"]["channels"],
-                    1,
-                ),
-            ]
-        )
-
-        self.detection_head = nn.Sequential(
-            nn.Conv2d(
-                config["fpn"]["channels"],
-                config["detection_head"]["intermediate_channels"],
-                config["detection_head"]["kernel_size"],
-                padding=config["detection_head"]["padding"],
-            ),
-            nn.ReLU(),
-            nn.Conv2d(
-                config["detection_head"]["intermediate_channels"],
-                self.num_anchors * (5 + self.num_classes),
-                1,
-            ),
-        )
-
-        self.lane_head = nn.Sequential(
-            nn.Conv2d(
-                config["fpn"]["channels"],
-                config["lane_head"]["intermediate_channels1"],
-                config["lane_head"]["kernel_size"],
-                padding=config["lane_head"]["padding"],
-            ),
-            nn.ReLU(),
-            nn.Conv2d(
-                config["lane_head"]["intermediate_channels1"],
-                config["lane_head"]["intermediate_channels2"],
-                config["lane_head"]["kernel_size"],
-                padding=config["lane_head"]["padding"],
-            ),
-            nn.ReLU(),
-            nn.Conv2d(
-                config["lane_head"]["intermediate_channels2"],
-                config["lane_head"]["output_channels"],
-                1,
-            ),
-        )
-=======
     
 # Feature Pyramid Network Definition
 class FeaturePyramidNetwork(nn.Module):
@@ -197,7 +123,6 @@ class RoIAlignLayer(nn.Module):
 
     def forward(self, features, rois):
         return self.roi_align(features, rois)
->>>>>>> Marc_Ramon_Moreno
 
 # Semantic Lane Head
 class SemanticLaneHead(nn.Module):
@@ -238,12 +163,6 @@ class LaneDetectionModel(nn.Module):
 
     def forward(self, images, rois):
         features = self.backbone(images)
-<<<<<<< HEAD
-
-        fpn_features = [fpn_layer(features) for fpn_layer in self.fpn]
-
-        concatenated_features = torch.cat(fpn_features, dim=1)
-=======
         pyramid_features = self.fpn(features)
         aligned_features = self.roi_align(pyramid_features, rois)
         mask_logits = self.mask_head(aligned_features)
@@ -278,7 +197,6 @@ class BDD100KDataset(Dataset):
     
     def __len__(self):
         return len(self.imgs)
->>>>>>> Marc_Ramon_Moreno
 
 def get_transform(train):
     transforms = []
@@ -287,16 +205,6 @@ def get_transform(train):
         transforms.append(RandomHorizontalFlip(0.5))
     return Compose(transforms)
 
-<<<<<<< HEAD
-        N, _, H, W = detection_output.shape
-        detection_output = detection_output.view(
-            N, self.num_anchors, 5 + self.num_classes, H, W
-        ).permute(0, 1, 3, 4, 2)
-
-        lane_output = self.lane_head(concatenated_features)
-
-        return detection_output, lane_output
-=======
 # Load Configuration
 def load_config(config_path):
     with open(config_path, 'r') as file:
@@ -344,4 +252,3 @@ def main():
 
 if __name__ == "__main__":
     main() """
->>>>>>> Marc_Ramon_Moreno
