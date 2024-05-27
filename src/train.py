@@ -8,8 +8,8 @@ from utils import read_yaml
 from dataloader import MyDataset
 from hyperparameters import hparams
 from utils import binary_accuracy_with_logits, save_model
-from model_ENet import ENet
-from modelDebug import SimpleSegmentationModel  # Debug Model
+from models.model_ENet import ENet
+from models.modelDebug import SimpleSegmentationModel  # Debug Model
 
 # from model_ENet_complete import ENet
 from torchvision import transforms
