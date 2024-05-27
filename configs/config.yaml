@@ -7,8 +7,12 @@
 #   hidden_units: 128
 #   learning_rate: 0.001
 
+logger:
+  log_filename: 'app.log'
+
 dataloader:
-  batch_size: 64
+  batch_size: 5
+  resize_width: 255
   images_path: "data\\images"
   mask_path: "data\\mask"
   log_filename: 'app.log'
@@ -60,7 +64,6 @@ lane_head:
   kernel_size: 3              # Kernel size for the convolutional layers in the lane head
   padding: 1                  # Padding for the convolutional layers in the lane head
   output_channels: 1          # Number of output channels for the final convolutional layer in the lane head
-
 train:
   train_images_path: "data/bdd100k/images/100k/train"
   train_labels_path: "data/bdd100k/labels/lane/masks/train"

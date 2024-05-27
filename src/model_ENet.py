@@ -360,9 +360,15 @@ class ENet(nn.Module):
     """Generate the ENet model."""
 
     def __init__(
-        self, num_classes: int, encoder_relu: bool = False, decoder_relu: bool = True
+        self,
+        num_classes: int,
+        encoder_relu: bool = False,
+        decoder_relu: bool = True,
+        binary_output: bool = False,
     ):
         super().__init__()
+        self.binary_output = binary_output
+
         self.initial_block = InitialBlock(3, 16, relu=encoder_relu)
 
         # Stage 1 - Encoder
@@ -424,6 +430,17 @@ class ENet(nn.Module):
         x = self.upsample4_0(x, max_indices1_0, output_size=stage1_input_size)
         x = self.regular4_1(x)
         x = self.transposed_conv(x, output_size=input_size)
+
+        return x
+
+    def predict(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.forward(x)
+
+        if self.binary_output:
+            # Apply sigmoid to get probabilities
+            x = torch.sigmoid(x)
+            # Apply threshold to get binary output
+            x = (x >= 0.5).float()
 
         return x
 
