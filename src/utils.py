@@ -5,87 +5,166 @@ import tarfile
 import shutil
 from pathlib import Path
 import yaml
+from typing import List, Optional, Any
+from logger import Logger
+
+logger = Logger()
 
 
-# Function use in train
-def binary_accuracy_with_logits(labels, outputs):
+def binary_accuracy_with_logits(labels: torch.Tensor, outputs: torch.Tensor) -> float:
+    """
+    Calculate the binary accuracy with logits.
+
+    Parameters:
+    labels (torch.Tensor): Ground truth labels.
+    outputs (torch.Tensor): Model outputs.
+
+    Returns:
+    float: Accuracy value.
+    """
     preds = torch.sigmoid(outputs).round()
+    # acc = (preds == labels.view_as(preds)).float().mean().item()
     acc = (preds == labels.view_as(preds)).float().detach().numpy().mean()
     return acc
 
-def list_files_in_folder(folder_path):
+
+def list_files_in_folder(folder_path: str) -> Optional[List[str]]:
+    """
+    List all .jpg files in a folder.
+
+    Parameters:
+    folder_path (str): Path to the folder.
+
+    Returns:
+    Optional[List[str]]: List of .jpg files in the folder, or None if an error occurs.
+    """
     try:
-        if not os.path.exists(folder_path):
-            print("Folder does not exist.")
+        folder = Path(folder_path)
+        if not folder.exists():
+            logger.log_error("Folder does not exist.")
             return []
-        # Get a list of all files and directories in the folder
-        files_in_folder = os.listdir(folder_path)
-        # Show only jpg files
-        files = [file for file in files_in_folder if file.lower().endswith('.jpg')]
-        return files
+        return [file.name for file in folder.glob("*.jpg")]
     except Exception as e:
-        print("Error listing files in folder:", e)
+        logger.log_error("Error listing files in folder:", e)
         return None
 
-def UnZipFolder(file_path, folder_inside, destination_path):
-    # Unzipp a folder from inside a ZIP file to a destination
-    if os.path.exists(destination_path+folder_inside):
-        print("Folder: "+destination_path+" exists")
+
+def unzip_folder(file_path: str, folder_inside: str, destination_path: str):
+    """
+    Unzip a folder from inside a ZIP or TAR/TGZ file to a destination.
+
+    Parameters:
+    file_path (str): Path to the ZIP or TAR/TGZ file.
+    folder_inside (str): Folder inside the archive to extract.
+    destination_path (str): Destination path to extract files to.
+    """
+    if os.path.exists(destination_path + folder_inside):
+        logger.log_error("Folder: " + destination_path + " exists")
     else:
-        if file_path.lower().endswith('.zip'):
+        if file_path.lower().endswith(".zip"):
             try:
-                with zipfile.ZipFile(file_path, 'r') as zip_ref:
-                    print("Unzipping folder..." + folder_inside)
+                with zipfile.ZipFile(file_path, "r") as zip_ref:
+                    logger.log_error("Unzipping folder..." + folder_inside)
                     all_members = zip_ref.getmembers()
-                    folder_members = [member for member in all_members 
-                                      if member.name.startswith(folder_inside)]
+                    folder_members = [
+                        member
+                        for member in all_members
+                        if member.name.startswith(folder_inside)
+                    ]
                     zip_ref.extractall(path=destination_path, members=folder_members)
-                    #Relocate the images to the destination_path
-                    for member in folder_members:                      
-                        if os.path.dirname(member.name):
-                            src = os.path.join(destination_path,member.name)
-                            dst = os.path.join(destination_path,os.path.basename(member.name))
-                            os.rename(src,dst)
-                    #Delete empty folder
-                    DeleteFolder = os.path.split(Path(folder_inside))
-                    shutil.rmtree(os.path.join(destination_path,DeleteFolder[0]))
-                    print("Unzipped in..." + destination_path)
-
-            except Exception as e:
-                print("Error extracting from ZIP file:", e)
-
-        # Unzipp a folder from inside a TAR/TGZ file to a destination
-        elif file_path.lower().endswith('.tar') or file_path.lower().endswith('.tgz'):
-            try:
-                with tarfile.open(file_path, 'r:gz') as tar_ref:
-                    print("Unzipping folder..." + folder_inside)
-                    all_members = tar_ref.getmembers()
-                    folder_members = [member for member in all_members 
-                                      if member.name.startswith(folder_inside)]
-                    tar_ref.extractall(path=destination_path, members=folder_members)
-                    #Relocate the images to the destination_path
+                    # Relocate the images to the destination_path
                     for member in folder_members:
                         if os.path.dirname(member.name):
-                            src = os.path.join(destination_path,member.name)
-                            dst = os.path.join(destination_path,os.path.basename(member.name))
-                            os.rename(src,dst)
-                    #Delete empty folder
+                            src = os.path.join(destination_path, member.name)
+                            dst = os.path.join(
+                                destination_path, os.path.basename(member.name)
+                            )
+                            os.rename(src, dst)
+                    # Delete empty folder
                     DeleteFolder = os.path.split(Path(folder_inside))
-                    shutil.rmtree(os.path.join(destination_path,DeleteFolder[0]))
-                    print("Unzipped in..." + destination_path)
+                    shutil.rmtree(os.path.join(destination_path, DeleteFolder[0]))
+                    logger.log_error("Unzipped in..." + destination_path)
 
             except Exception as e:
-                print("Error extracting from TAR/TGZ file:", e)
+                logger.log_error("Error extracting from ZIP file:", e)
 
-def read_yaml(file_path):
+        # Unzipp a folder from inside a TAR/TGZ file to a destination
+        elif file_path.lower().endswith(".tar") or file_path.lower().endswith(".tgz"):
+            try:
+                with tarfile.open(file_path, "r:gz") as tar_ref:
+                    logger.log_error("Unzipping folder..." + folder_inside)
+                    all_members = tar_ref.getmembers()
+                    folder_members = [
+                        member
+                        for member in all_members
+                        if member.name.startswith(folder_inside)
+                    ]
+                    tar_ref.extractall(path=destination_path, members=folder_members)
+                    # Relocate the images to the destination_path
+                    for member in folder_members:
+                        if os.path.dirname(member.name):
+                            src = os.path.join(destination_path, member.name)
+                            dst = os.path.join(
+                                destination_path, os.path.basename(member.name)
+                            )
+                            os.rename(src, dst)
+                    # Delete empty folder
+                    DeleteFolder = os.path.split(Path(folder_inside))
+                    shutil.rmtree(os.path.join(destination_path, DeleteFolder[0]))
+                    logger.log_error("Unzipped in..." + destination_path)
+
+            except Exception as e:
+                logger.log_error("Error extracting from TAR/TGZ file:", e)
+
+
+def read_yaml(file_path: str) -> Optional[dict]:
+    """
+    Read a YAML file.
+
+    Parameters:
+    file_path (str): Path to the YAML file.
+
+    Returns:
+    Optional[dict]: Parsed YAML data, or None if an error occurs.
+    """
     try:
-        with open(file_path, 'r') as file:
-            data = yaml.safe_load(file)
-            return data
+        with open(file_path, "r") as file:
+            return yaml.safe_load(file)
     except FileNotFoundError:
-        print(f"Error: The file {file_path} was not found.")
+        logger.log_error(f"Error: The file {file_path} was not found.")
     except yaml.YAMLError as exc:
-        print(f"Error parsing YAML file: {exc}")
+        logger.log_error(f"Error parsing YAML file: {exc}")
     except Exception as exc:
-        print(f"An unexpected error occurred: {exc}")
+        logger.log_error(f"An unexpected error occurred: {exc}")
+    return None
 
+
+def accuracy(labels: torch.Tensor, outputs: torch.Tensor) -> float:
+    """
+    Calculate the accuracy.
+
+    Parameters:
+    labels (torch.Tensor): Ground truth labels.
+    outputs (torch.Tensor): Model outputs.
+
+    Returns:
+    float: Accuracy value.
+    """
+    preds = outputs.argmax(dim=-1)
+    acc = (preds == labels.view_as(preds)).float().mean().item()
+    return acc
+
+
+def save_model(model: torch.nn.Module, model_name: str):
+    """
+    Save the model's state dictionary.
+
+    Parameters:
+    model (torch.nn.Module): The model to save.
+    model_name (str): The name of the model file.
+    """
+    save_folder = Path("models")
+    save_folder.mkdir(parents=True, exist_ok=True)
+    filepath = save_folder / model_name
+    torch.save(model.state_dict(), filepath)
+    logger.log_debug(f"Model saved at {filepath}")
