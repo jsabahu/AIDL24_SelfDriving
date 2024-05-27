@@ -113,30 +113,11 @@ def train_single_epoch_lane_model(model, train_loader, optimizer):
     return mean_loss, mean_acc
 
 
-def train_model(hparams):
+def train_model(hparams: dict, train_loader: DataLoader):
     """
     Train the model based on the provided hyperparameters.
     """
     logger.log_debug("Starting model training")
-
-    # Define transformation
-    transform = transforms.Compose(
-        [
-            transforms.Resize((360, 640), antialias=True),
-            transforms.ToTensor(),
-            # transforms.Normalize(mean=[0.5, 0.5],std=[0.5, 0.5]),
-        ]
-    )
-
-    # Create training dataset and DataLoader
-    train_dataset = MyDataset(
-        images_path=config["train"]["train_images_path"],
-        mask_path=config["train"]["train_labels_path"],
-        transform=transform,
-    )
-    train_loader = DataLoader(
-        train_dataset, batch_size=hparams["batch_size"], shuffle=True
-    )
 
     # Initialize model
     model = ENet(

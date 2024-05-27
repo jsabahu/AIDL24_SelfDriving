@@ -8,6 +8,7 @@ from train import train_model, train_model2
 from utils import save_model
 from pathlib import Path
 from hyperparameters import hparams
+from torch.utils.data import DataLoader
 
 logger = Logger()
 
@@ -29,6 +30,25 @@ def main_jordi():
         "weight_decay": 0.01,
         "num_epochs": 5,
     }
+
+    # Define transformation
+    transform = transforms.Compose(
+        [
+            transforms.Resize((360, 640), antialias=True),
+            transforms.ToTensor(),
+            # transforms.Normalize(mean=[0.5, 0.5],std=[0.5, 0.5]),
+        ]
+    )
+
+    # Create training dataset and DataLoader
+    train_dataset = MyDataset(
+        images_path=config["train"]["train_images_path"],
+        mask_path=config["train"]["train_labels_path"],
+        transform=transform,
+    )
+    train_loader = DataLoader(
+        train_dataset, batch_size=hparams["batch_size"], shuffle=True
+    )
 
     my_model = train_model(hparams=hparams)
 
