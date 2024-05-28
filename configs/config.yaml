@@ -62,10 +62,21 @@ semantic_lane_head:
     stride: 2             # Stride for the deconvolutional layer
   mask_fcn_logits:
     kernel_size: 1        # Kernel size for the final mask prediction layer
-    
+
 dataloader:
   batch_size: 64
   images_path: "data\\images"
   mask_path: "data\\mask"
   log_filename: 'app.log'
-  
+
+train:
+  train_images_path: "data/bdd100k/images/100k/train"
+  train_labels_path: "data/bdd100k/labels/lane/masks/train"
+  model_name: "Lane_Model_ENet.pth"
+
+main:
+  log_filename: "main.log"
+
+validation:
+  val_images_path: "data/bdd100k/images/100k/val"
+  val_labels_path: "data/bdd100k/labels/lane/masks/val"
