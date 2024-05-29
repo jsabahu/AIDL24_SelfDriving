@@ -8,6 +8,9 @@ import random
 from logger import Logger
 from utils import read_yaml
 from models.model_ENet import ENet
+from torchvision import transforms
+from torchviz import make_dot
+
 
 logger = Logger()
 
@@ -32,18 +35,42 @@ class LaneDetectionEvaluator:
 
     def evaluate(self, image, mask):
         with torch.no_grad():
-            # Prepare the image
-            image_tensor = torch.from_numpy(image).unsqueeze(0).to(self.device).float()
+
+            my_transforms = transforms.Compose(
+                [
+                    transforms.Resize((360, 640), antialias=True),
+                    transforms.ToTensor(),
+                ]
+            )
+
+            image = my_transforms(image).unsqueeze(0).to(self.device)
+            mask = my_transforms(mask).to(self.device)
+            mask = (mask == 1).type(torch.int)
 
             # Get the model output
-            output = self.model(image_tensor)
-            # output = torch.sigmoid(output)
-            # output = (output >= 0.5).float()
+            output = self.model(image)
+
+            make_dot(output, params=dict(list(self.model.named_parameters()))).render(
+                "rnn_torchviz", format="png"
+            )
+
+            output = torch.sigmoid(output)
+            output = (output >= 0.5).float()
+            print(output)
 
             # Convert tensors to numpy arrays
-            image_np = image.transpose(1, 2, 0)  # Convert to HWC
-            mask_np = mask.squeeze()  # Remove channel dimension if exists
-            output_np = output.squeeze().cpu().numpy()  # Squeeze and move to CPU
+            image_np = (
+                image.squeeze(0).permute(1, 2, 0).cpu().numpy()
+            )  # Convert to HWC and move to CPU
+            mask_np = (
+                mask.squeeze().cpu().numpy()
+            )  # Remove channel dimension and move to CPU
+            output_np = (
+                torch.sigmoid(output).squeeze().cpu().numpy()
+            )  # Apply sigmoid, squeeze, and move to CPU
+
+            # Binarize the output
+            output_np = (output_np >= 0.5).astype(np.float32)
 
             # Plot the images
             self.plot_results(image_np, mask_np, output_np)
@@ -86,4 +113,4 @@ if __name__ == "__main__":
     image = Image.open(img_path).convert("RGB")  # Ensure image is in RGB mode
     mask = Image.open(mask_path).convert("L")  # Convert mask to grayscale
 
-    # evaluator.evaluate(image, mask)
+    evaluator.evaluate(image, mask)

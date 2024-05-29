@@ -17,14 +17,11 @@ from logger import Logger
 from torch.utils.tensorboard import SummaryWriter
 import os
 import matplotlib.pyplot as plt
+from time import time
 
 # Initialize tensorboard writer and logger
 writer = SummaryWriter()
 logger = Logger()
-
-# Define device
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-logger.log_debug(f"Using device: {device}")
 
 # Read configuration
 config_path = "configs/config.yaml"
@@ -113,10 +110,15 @@ def train_single_epoch_lane_model(model, train_loader, optimizer):
     return mean_loss, mean_acc
 
 
-def train_model(hparams: dict, train_loader: DataLoader):
-    """
-    Train the model based on the provided hyperparameters.
-    """
+def train_model(
+    model: torch.nn.Module,
+    hparams: dict,
+    train_loader: DataLoader,
+    optimizer,
+    device,
+    loss,
+):
+    t1 = time()
     logger.log_debug("Starting model training")
 
     # Initialize model

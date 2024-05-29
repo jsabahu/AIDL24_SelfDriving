@@ -80,3 +80,9 @@ main:
 validation:
   val_images_path: "data/bdd100k/images/100k/val"
   val_labels_path: "data/bdd100k/labels/lane/masks/val"
+
+resolution:
+  720p: [720,1280]
+  480p: [480, 854]
+  360p: [360,640]
+  240p: [240,426]
