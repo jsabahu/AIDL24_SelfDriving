@@ -12,7 +12,7 @@ from torchvision.transforms import ToTensor, Compose, RandomHorizontalFlip
 
 # Load hyperparameters from config file
 with open("configs/config.yaml", "r") as file:
-    config = yaml.safe_load(file)
+    CONFIG = yaml.safe_load(file)
 
 
 class CustomBackbone(nn.Module):
@@ -221,7 +221,7 @@ class SemanticLaneHead(nn.Module):
 
 # Model Integration
 class LaneDetectionModel(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config=CONFIG):
         super(LaneDetectionModel, self).__init__()
         self.backbone = CustomBackbone(config)
         backbone_out_channels = [
@@ -322,6 +322,13 @@ def main():
         # Add evaluation logic here
 
     torch.save(model.state_dict(), 'lane_detection_model.pth')
+"""
 
 if __name__ == "__main__":
-    main() """
+    # Example usage
+    # from torchviz import make_dot
+    model = LaneDetectionModel()
+    input_image = torch.randn(1, 3, 255, 255)
+    output = model(input_image)
+    # make_dot(output, params=dict(list(model.named_parameters()))).render("rnn_torchviz", format="png")
+    print("Output Shape:", output.shape)
