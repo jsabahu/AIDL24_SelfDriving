@@ -1,14 +1,9 @@
 import yaml
 import torch
 import torch.nn as nn
-import torch.optim as optim
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, Dataset
 from torchvision.ops import RoIAlign
-import os
-from PIL import Image
-import numpy as np
-from torchvision.transforms import ToTensor, Compose, RandomHorizontalFlip
+from logger import Logger
 
 # Load hyperparameters from config file
 with open("configs/config.yaml", "r") as file:
@@ -19,7 +14,6 @@ class CustomBackbone(nn.Module):
     def __init__(self, config=CONFIG):
         super(CustomBackbone, self).__init__()
 
-        # First convolutional layer
         self.conv1 = nn.Conv2d(
             config["model"]["input_channels"],
             config["backbone"]["conv1"]["out_channels"],
@@ -31,7 +25,6 @@ class CustomBackbone(nn.Module):
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
 
-        # Define blocks of layers
         self.layer1 = self._make_layer(
             config["backbone"]["layer1"]["in_channels"],
             config["backbone"]["layer1"]["out_channels"],
@@ -79,15 +72,14 @@ class CustomBackbone(nn.Module):
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
-        x = self.maxpool(x)
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
-        return x
+        c1 = self.maxpool(x)
+        c2 = self.layer1(c1)
+        c3 = self.layer2(c2)
+        c4 = self.layer3(c3)
+        c5 = self.layer4(c4)
+        return c2, c3, c4, c5
 
 
-# Feature Pyramid Network Definition
 class FeaturePyramidNetwork(nn.Module):
     def __init__(self, config=CONFIG, backbone_out_channels=[]):
         super(FeaturePyramidNetwork, self).__init__()
@@ -111,7 +103,6 @@ class FeaturePyramidNetwork(nn.Module):
             config["fpn"]["lateral"]["out_channels"],
             kernel_size=1,
         )
-
         self.smooth4 = nn.Conv2d(
             config["fpn"]["lateral"]["out_channels"],
             config["fpn"]["smooth"]["out_channels"],
@@ -153,21 +144,60 @@ class FeaturePyramidNetwork(nn.Module):
         return p1, p2, p3, p4
 
 
-# RoI Align Layer
-class RoIAlignLayer(nn.Module):
-    def __init__(self, config):
-        super(RoIAlignLayer, self).__init__()
-        self.roi_align = RoIAlign(
-            config["roi_align"]["output_size"],
-            spatial_scale=config["roi_align"]["spatial_scale"],
-            sampling_ratio=config["roi_align"]["sampling_ratio"],
+class PyramidRoIAlign(nn.Module):
+    def __init__(self, pool_size, image_shape):
+        super(PyramidRoIAlign, self).__init__()
+        self.pool_size = pool_size
+        self.image_shape = image_shape
+
+    def forward(self, boxes, feature_maps):
+        if boxes.shape[1] != 5:
+            raise ValueError(
+                "RoIs should be in the format [batch_index, x1, y1, x2, y2]"
+            )
+
+        y1, x1, y2, x2 = boxes[:, 1], boxes[:, 2], boxes[:, 3], boxes[:, 4]
+        h = y2 - y1
+        w = x2 - x1
+
+        image_area = self.image_shape[0] * self.image_shape[1]
+        roi_level = 4 + torch.log2(
+            torch.sqrt(h * w)
+            / (224.0 / torch.sqrt(torch.tensor(image_area, dtype=torch.float32)))
         )
+        roi_level = roi_level.round().int().clamp(2, 5)
 
-    def forward(self, features, rois):
-        return self.roi_align(features, rois)
+        pooled = []
+        box_to_level = []
+
+        for i, level in enumerate(range(2, 6)):
+            ix = roi_level == level
+            if not ix.any():
+                continue
+            ix = torch.nonzero(ix)[:, 0]
+            level_boxes = boxes[ix, :]
+
+            box_to_level.append(ix)
+
+            level_boxes = level_boxes.detach()
+            indices = level_boxes[:, 0].int()
+            level_boxes = level_boxes[:, 1:]
+            pooled_features = RoIAlign(
+                self.pool_size, spatial_scale=1 / (2**level), sampling_ratio=0
+            )(
+                feature_maps[i],
+                torch.cat([indices[:, None].float(), level_boxes], dim=1),
+            )
+            pooled.append(pooled_features)
+
+        pooled = torch.cat(pooled, dim=0)
+        box_to_level = torch.cat(box_to_level, dim=0)
+        _, box_to_level = torch.sort(box_to_level)
+        pooled = pooled[box_to_level, :, :]
+
+        return pooled
 
 
-# Semantic Lane Head
 class SemanticLaneHead(nn.Module):
     def __init__(self, config):
         super(SemanticLaneHead, self).__init__()
@@ -230,107 +260,39 @@ class LaneDetectionModel(nn.Module):
             config["backbone"]["layer3"]["out_channels"],
             config["backbone"]["layer4"]["out_channels"],
         ]
-        self.fpn = FeaturePyramidNetwork(backbone_out_channels, config)
-        self.roi_align = RoIAlignLayer(config)
+        image_shape = config.get("model", {}).get("image_shape", [256, 256, 3])
+        self.fpn = FeaturePyramidNetwork(
+            config=config, backbone_out_channels=backbone_out_channels
+        )
+        self.pyramid_roi_align = PyramidRoIAlign(
+            pool_size=config["roi_align"]["output_size"], image_shape=image_shape
+        )
         self.mask_head = SemanticLaneHead(config)
 
     def forward(self, images, rois):
         features = self.backbone(images)
         pyramid_features = self.fpn(features)
-        aligned_features = self.roi_align(pyramid_features, rois)
+        aligned_features = self.pyramid_roi_align(rois, pyramid_features)
         mask_logits = self.mask_head(aligned_features)
         return mask_logits
 
 
-""" # Dataset and DataLoader Definitions
-class BDD100KDataset(Dataset):
-    def __init__(self, root, transforms):
-        self.root = root
-        self.transforms = transforms
-        self.imgs = list(sorted(os.listdir(os.path.join(root, "images"))))
-        self.masks = list(sorted(os.listdir(os.path.join(root, "masks"))))
-
-    def __getitem__(self, idx):
-        img_path = os.path.join(self.root, "images", self.imgs[idx])
-        mask_path = os.path.join(self.root, "masks", self.masks[idx])
-        img = Image.open(img_path).convert("RGB")
-        mask = Image.open(mask_path)
-
-        mask = np.array(mask)
-        mask = mask.astype(np.uint8)
-        masks = torch.as_tensor(mask, dtype=torch.uint8)
-
-        target = {}
-        target["masks"] = masks.unsqueeze(0)
-
-        if self.transforms is not None:
-            img, target = self.transforms(img, target)
-
-        return img, target
-
-    def __len__(self):
-        return len(self.imgs)
-
-def get_transform(train):
-    transforms = []
-    transforms.append(ToTensor())
-    if train:
-        transforms.append(RandomHorizontalFlip(0.5))
-    return Compose(transforms)
-
-# Load Configuration
-def load_config(config_path):
-    with open(config_path, 'r') as file:
-        config = yaml.safe_load(file)
-    return config
-
-# Example of Usage
-def main():
-    config_path = 'config.yaml'
-    config = load_config(config_path)
-
-    dataset = BDD100KDataset(root='data/bdd100k', transforms=get_transform(train=True))
-    dataset_test = BDD100KDataset(root='data/bdd100k', transforms=get_transform(train=False))
-
-    data_loader = DataLoader(dataset, batch_size=config['dataloader']['batch_size'], shuffle=True, num_workers=config['dataloader']['num_workers'])
-    data_loader_test = DataLoader(dataset_test, batch_size=1, shuffle=False, num_workers=config['dataloader']['num_workers'])
-
-    model = LaneDetectionModel(config)
-    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-    model.to(device)
-
-    params = [p for p in model.parameters() if p.requires_grad]
-    optimizer = optim.SGD(params, lr=config['model']['learning_rate'], momentum=0.9, weight_decay=0.0005)
-    lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
-
-    num_epochs = 10
-    for epoch in range(num_epochs):
-        model.train()
-        for images, targets in data_loader:
-            images = list(image.to(device) for image in images)
-            targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
-
-            loss_dict = model(images, targets)
-            losses = sum(loss for loss in loss_dict.values())
-
-            optimizer.zero_grad()
-            losses.backward()
-            optimizer.step()
-
-        lr_scheduler.step()
-
-        # Add evaluation logic here
-
-    torch.save(model.state_dict(), 'lane_detection_model.pth')
-"""
-
 if __name__ == "__main__":
+    logger = Logger(log_file="logfile.log", level="debug")
     # Example usage
-    # from torchviz import make_dot
-    model = FeaturePyramidNetwork(backbone_out_channels=[1, 512, 8, 8])
-    input_image = [1, 512, 8, 8]
-    # input_image = torch.randn(1, 3, 255, 255)
-    output = model(input_image)
+    config = CONFIG
 
-    # make_dot(output, params=dict(list(model.named_parameters()))).render("rnn_torchviz", format="png")
-    print("Output Shape:", output.shape)
+    # Initialize the complete model
+    model = LaneDetectionModel(config=config)
+
+    # Generate an example input image and ROIs
+    input_images = torch.randn(1, 3, 256, 256)
+    rois = torch.tensor(
+        [[0, 50, 50, 150, 150], [0, 30, 30, 100, 100]], dtype=torch.float32
+    )
+
+    # Pass the input image and ROIs through the model
+    output = model(input_images, rois)
+
+    # Print the output shape of the model
+    logger.log_info(f"Lane Detection Model Output Shape: {output.shape}")
