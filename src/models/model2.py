@@ -16,7 +16,7 @@ with open("configs/config.yaml", "r") as file:
 
 
 class CustomBackbone(nn.Module):
-    def __init__(self):
+    def __init__(self, config=CONFIG):
         super(CustomBackbone, self).__init__()
 
         # First convolutional layer
@@ -89,7 +89,7 @@ class CustomBackbone(nn.Module):
 
 # Feature Pyramid Network Definition
 class FeaturePyramidNetwork(nn.Module):
-    def __init__(self, config, backbone_out_channels):
+    def __init__(self, config=CONFIG, backbone_out_channels=[]):
         super(FeaturePyramidNetwork, self).__init__()
         self.lateral4 = nn.Conv2d(
             backbone_out_channels[3],
@@ -327,8 +327,10 @@ def main():
 if __name__ == "__main__":
     # Example usage
     # from torchviz import make_dot
-    model = LaneDetectionModel()
-    input_image = torch.randn(1, 3, 255, 255)
+    model = FeaturePyramidNetwork(backbone_out_channels=[1, 512, 8, 8])
+    input_image = [1, 512, 8, 8]
+    # input_image = torch.randn(1, 3, 255, 255)
     output = model(input_image)
+
     # make_dot(output, params=dict(list(model.named_parameters()))).render("rnn_torchviz", format="png")
     print("Output Shape:", output.shape)
