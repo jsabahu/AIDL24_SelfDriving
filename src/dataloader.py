@@ -55,7 +55,9 @@ class MaskDataset(Dataset):
 
         if self.transform:
             image = self.transform(image)
-            mask = self.transform(mask)
+            mask = self.transform(
+                mask
+            )  # Es correcte aplicar totes les transformacions a la mask?????
 
         mask = (mask == 1).type(torch.int)
 
