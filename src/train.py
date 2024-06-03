@@ -5,26 +5,22 @@ import torch.optim as optim
 import numpy as np
 from torcheval.metrics.functional import binary_accuracy
 from utils import read_yaml
-from dataloader import MyDataset
 from hyperparameters import hparams
 from utils import binary_accuracy_with_logits, save_model
-from model_ENet import ENet
-from modelDebug import SimpleSegmentationModel  # Debug Model
-
-# from model_ENet_complete import ENet
+from models.model_ENet import ENet
+from models.modelDebug import SimpleSegmentationModel  # Debug Model
 from torchvision import transforms
 from logger import Logger
 from torch.utils.tensorboard import SummaryWriter
-import os
 import matplotlib.pyplot as plt
+from time import time
+import copy
+from loss import FocalLoss, DiscriminativeLoss
+import torch.nn as nn
 
 # Initialize tensorboard writer and logger
 writer = SummaryWriter()
 logger = Logger()
-
-# Define device
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-logger.log_debug(f"Using device: {device}")
 
 # Read configuration
 config_path = "configs/config.yaml"
@@ -68,117 +64,123 @@ def train_single_epoch(model, train_loader, optimizer):
     return np.mean(losses), np.mean(accs)
 
 
-def train_single_epoch_lane_model(model, train_loader, optimizer):
+def single_epoch_lane_model(model, dataloader, optimizer, device, phase):
     """
-    Train the lane detection model for a single epoch.
+    Train or val the lane detection model for a single epoch.
     """
-    logger.log_debug("Starting training single epoch (Lane Model)")
+    logger.log_debug(f"Starting {phase} single epoch (Lane Model)")
 
-    model.train()  # Set model to training mode
+    if phase == "train":
+        model.train()
+    elif phase == "val":
+        model.eval()
+
     accs, losses = [], []  # Initialize accuracies and losses
 
-    for step, (images, masks) in enumerate(train_loader):
-        images, masks = images.to(device), masks.to(device)
+    for step, (images, masks) in enumerate(dataloader):
+        images = images.type(torch.FloatTensor).to(device)
+        masks = masks.type(torch.LongTensor).to(device)
+
         optimizer.zero_grad()  # Zero the gradients
 
         # Forward pass
-        lane_output = model(images.float())
-        masks = masks.float()
+        # track history if only in train
+        with torch.set_grad_enabled(phase == "train"):
+            outputs = model(images)
+            # loss = F.binary_cross_entropy_with_logits(outputs, masks)
+            loss = compute_loss(outputs, binary_label=masks)
 
-        # Compute loss
-        loss = F.binary_cross_entropy_with_logits(lane_output, masks)
-
-        # Backward pass and update
-        loss.backward()
-        optimizer.step()
+            # backward + optimize only if in training phase
+            if phase == "train":
+                loss.backward()
+                optimizer.step()
 
         # Flatten the output and target tensors
-        lane_output_flat = lane_output.view(-1)
+        outputs_flat = outputs.view(-1)
         masks_flat = masks.view(-1)
 
-        acc = binary_accuracy(lane_output_flat, masks_flat, threshold=0.5)
+        acc = binary_accuracy(outputs_flat, masks_flat, threshold=0.5)
 
         logger.log_debug(
-            f"Step {step}/{len(train_loader)}: loss={loss.item()}, acc={acc.item()}"
+            f"{phase} phase: Step {step}/{len(dataloader)}: loss={loss.item()}, acc={acc.item()}"
         )
+
         losses.append(loss.item())
         accs.append(acc.item())
 
     mean_loss = np.mean(losses)
     mean_acc = np.mean(accs)
     logger.log_debug(
-        f"Epoch completed with mean loss: {mean_loss}, mean accuracy: {mean_acc}"
+        f"{phase} phase --> Epoch completed with mean loss: {mean_loss}, mean accuracy: {mean_acc}"
     )
 
     return mean_loss, mean_acc
 
 
-def train_model(hparams):
-    """
-    Train the model based on the provided hyperparameters.
-    """
+def train_model(
+    model: torch.nn.Module,
+    hparams: dict,
+    train_loader: DataLoader,
+    val_loader: DataLoader,
+    optimizer,
+    device,
+):
+    t1 = time()
     logger.log_debug("Starting model training")
+    training_log = {"epoch": [], "training_loss": [], "val_loss": []}
+    best_loss = float("inf")
+    best_model_wts = copy.deepcopy(model.state_dict())
+    num_epochs = hparams["num_epochs"]
 
-    # Define transformation
-    transform = transforms.Compose(
-        [
-            transforms.Resize((360, 640), antialias=True),
-            transforms.ToTensor(),
-            # transforms.Normalize(mean=[0.5, 0.5],std=[0.5, 0.5]),
-        ]
-    )
+    for epoch in range(num_epochs):
+        training_log["epoch"].append(epoch)
+        logger.log_debug("Epoch {}/{}".format(epoch, num_epochs - 1))
+        logger.log_debug("-" * 10)
 
-    # Create training dataset and DataLoader
-    train_dataset = MyDataset(
-        images_path=config["train"]["train_images_path"],
-        mask_path=config["train"]["train_labels_path"],
-        transform=transform,
-    )
-    train_loader = DataLoader(
-        train_dataset, batch_size=hparams["batch_size"], shuffle=True
-    )
+        for phase in ["train", "val"]:
 
-    # Initialize model
-    model = ENet(
-        num_classes=1,
-        binary_output=True,
-    ).to(device)
+            if phase == "train":
+                loss, acc = single_epoch_lane_model(
+                    model=model,
+                    dataloader=train_loader,
+                    optimizer=optimizer,
+                    device=device,
+                    phase=phase,
+                )
+            elif phase == "val":
+                loss, acc = single_epoch_lane_model(
+                    model=model,
+                    dataloader=val_loader,
+                    optimizer=optimizer,
+                    device=device,
+                    phase=phase,
+                )
 
-    # Initialize optimizer
-    # Self-drive examples found use the Adam optimizer
-    optimizer = optim.Adam(
-        model.parameters(),
-        lr=hparams["learning_rate"],
-        weight_decay=hparams["weight_decay"],
-    )
+            logger.log_debug(f"{phase} Epoch {epoch} loss={loss:.2f} acc={acc:.2f}")
 
-    # Initialize best_loss
-    best_loss = float("inf")  # Inicialitzar best_loss
+            writer.add_scalar(f"Loss/{phase}", loss, epoch)
+            writer.add_scalar(f"Acc/{phase}", acc, epoch)
 
-    for epoch in range(hparams["num_epochs"]):
-        logger.log_debug(f"Starting epoch {epoch}")
+            # deep copy the model
+            if phase == "train":
+                training_log["training_loss"].append(loss)
+            if phase == "val":
+                training_log["val_loss"].append(loss)
+                if loss < best_loss:
+                    best_loss = loss
+                    best_model_wts = copy.deepcopy(model.state_dict())
 
-        # Train for one epoch
-        train_loss, train_acc = train_single_epoch_lane_model(
-            model, train_loader, optimizer
-        )
-
-        logger.log_debug(
-            f"Train Epoch {epoch} loss={train_loss:.2f} acc={train_acc:.2f}"
-        )
-        writer.add_scalar("Loss/train", train_loss, epoch)
-        writer.add_scalar("Acc/train", train_acc, epoch)
-
-        # Save best model
-        if train_loss < best_loss:
-            best_model = model
-            best_loss = train_loss
-            save_model(best_model, config["train"]["model_name"])
-            logger.log_debug(f"Saved best model with loss {best_loss:.2f} ")
+    t2 = time() - t1
 
     writer.flush()
-    logger.log_debug("Training completed")
-    return best_model
+    logger.log_debug("Training complete in {:.0f}m {:.0f}s".format(t2 // 60, t2 % 60))
+    logger.log_debug("Best val_loss: {:4f}".format(best_loss))
+    training_log["training_loss"] = np.array(training_log["training_loss"])
+    training_log["val_loss"] = np.array(training_log["val_loss"])
+
+    # load best model weights
+    model.load_state_dict(best_model_wts)
+    return model, training_log
 
 
 def train_model2(hparams, train_loader):
@@ -228,3 +230,23 @@ def train_model2(hparams, train_loader):
     plt.show()
 
     return model
+
+
+def compute_loss(output, binary_label, loss_type="FocalLoss"):
+    k_binary = 10  # 1.7
+
+    print(binary_label.shape)
+
+    if loss_type == "FocalLoss":
+        loss_fn = FocalLoss(gamma=2, alpha=0.25)
+    elif loss_type == "CrossEntropyLoss":
+        loss_fn = nn.CrossEntropyLoss()
+    else:
+        logger.log_warning("Wrong loss type, will use the default CrossEntropyLoss")
+        loss_fn = nn.CrossEntropyLoss()
+
+    binary_loss = loss_fn(output, binary_label)
+
+    binary_loss = binary_loss * k_binary
+
+    return binary_loss

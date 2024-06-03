@@ -364,7 +364,7 @@ class ENet(nn.Module):
         num_classes: int,
         encoder_relu: bool = False,
         decoder_relu: bool = True,
-        binary_output: bool = False,
+        binary_output: bool = True,
     ):
         super().__init__()
         self.binary_output = binary_output
@@ -447,7 +447,9 @@ class ENet(nn.Module):
 
 if __name__ == "__main__":
     # Example usage
+    # from torchviz import make_dot
     model = ENet(num_classes=1)
-    input_image = torch.randn(64, 3, 256, 256)
+    input_image = torch.randn(1, 3, 720, 1280)
     output = model(input_image)
+    # make_dot(output, params=dict(list(model.named_parameters()))).render("rnn_torchviz", format="png")
     print("Output Shape:", output.shape)

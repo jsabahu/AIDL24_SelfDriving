@@ -71,13 +71,20 @@ dataloader:
   log_filename: 'app.log'
 
 train:
-  train_images_path: "data/bdd100k/images/100k/train"
-  train_labels_path: "data/bdd100k/labels/lane/masks/train"
-  model_name: "Lane_Model_ENet.pth"
+  images_path: "data/bdd100k/images/100k/train"
+  labels_path: "data/bdd100k/labels/lane/masks/train"
 
 main:
   log_filename: "main.log"
+  save_model_path: "models/Lane_Model_ENet.pth"
+  logs_dir: "logs/"
 
-validation:
-  val_images_path: "data/bdd100k/images/100k/val"
-  val_labels_path: "data/bdd100k/labels/lane/masks/val"
+val:
+  images_path: "data/bdd100k/images/100k/val"
+  labels_path: "data/bdd100k/labels/lane/masks/val"
+
+resolution:
+  720p: [720,1280]
+  480p: [480, 854]
+  360p: [360,640]
+  240p: [240,426]
