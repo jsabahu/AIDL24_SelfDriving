@@ -32,7 +32,7 @@ except Exception as e:
     raise
 
 
-def train_single_epoch(model, train_loader, optimizer):
+def train_single_epoch(model, train_loader, optimizer, device):
     model.train()  # Model in training mode
     accs, losses = [], []  # Init accuracies and losses
     for Image_cnt, (images, masks) in enumerate(train_loader):
@@ -47,7 +47,8 @@ def train_single_epoch(model, train_loader, optimizer):
         output = output.reshape(-1)
         masks = masks.reshape(-1)
         # Compute loss
-        loss = F.binary_cross_entropy_with_logits(output, masks)  # Calculate loss
+        #loss = F.binary_cross_entropy_with_logits(output, masks)  # Calculate loss
+        loss = compute_loss(output, binary_label=masks)
         # Backward pass: compute gradients of the loss with respect to model parameters
         loss.backward()
         # Update parameters of the network
@@ -183,7 +184,7 @@ def train_model(
     return model, training_log
 
 
-def train_model2(hparams, train_loader):
+def train_model2(hparams, train_loader, device):
     # First trials, just one class: Line road??
     model = SimpleSegmentationModel().to(device)  # Just one class: "LINE ROAD"?<-
     logger.log_info("Train Model Called")
@@ -191,7 +192,7 @@ def train_model2(hparams, train_loader):
     # Self-drive examples found use the Adam optimizer
     optimizer = optim.Adam(
         model.parameters(),
-        lr=hparams["learning_rate"],
+        lr=hparams["lr"],
         weight_decay=hparams["weight_decay"],
     )  # Note use weight_decay to prevent overfitting
     logger.log_info("Train Optimizer")
@@ -203,7 +204,7 @@ def train_model2(hparams, train_loader):
     for epoch in range(num_epoch):
         # Train model for 1 epoch
         logger.log_info(f"Train Epoch {epoch+1}/{num_epoch}")
-        train_loss, train_acc = train_single_epoch(model, train_loader, optimizer)
+        train_loss, train_acc = train_single_epoch(model, train_loader, optimizer, device)
         logger.log_info(
             f"Train Epoch {epoch} loss={train_loss:.2f} acc={train_acc:.2f}"
         )

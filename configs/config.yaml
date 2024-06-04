@@ -64,12 +64,6 @@ semantic_lane_head:
   mask_fcn_logits:
     kernel_size: 1        # Kernel size for the final mask prediction layer
 
-dataloader:
-  batch_size: 64
-  images_path: "data\\images"
-  mask_path: "data\\mask"
-  log_filename: 'app.log'
-
 train:
   images_path: "data/bdd100k/images/100k/train"
   labels_path: "data/bdd100k/labels/lane/masks/train"
