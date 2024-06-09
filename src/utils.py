@@ -168,3 +168,11 @@ def save_model(model: torch.nn.Module, model_name: str):
     filepath = save_folder / model_name
     torch.save(model.state_dict(), filepath)
     logger.log_debug(f"Model saved at {filepath}")
+
+
+def generate_full_image_rois(batch_size, image_width, image_height ):
+    rois = []
+    for i in range(batch_size):
+        # RoI format: [batch_index, x1, y1, x2, y2]
+        rois.append([i, 0, 0, image_width, image_height])
+    return torch.tensor(rois, dtype=torch.float32)
