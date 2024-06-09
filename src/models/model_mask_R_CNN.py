@@ -278,6 +278,7 @@ class LaneDetectionModel(nn.Module):
         mask_logits = F.sigmoid(mask_logits)
         return mask_logits
 
+# Example usage
 if __name__ == "__main__":
     import sys
     import os
@@ -297,7 +298,6 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.log_debug(f"Using device: {device}")
 
-
     # Load hyperparameters from config file
     with open("configs\\config.yaml", "r") as file:
         CONFIG = yaml.safe_load(file)
@@ -307,7 +307,7 @@ if __name__ == "__main__":
     mask = Image.open("data\\bdd100k\\labels\\lane\\masks\\train\\0000f77c-cb820c98.png").convert("L")  # Convert mask to grayscale
     
     # Prepare image
-    transform = transforms.Compose([transforms.ToTensor(),transforms.Resize((320, 180),antialias=True)])
+    transform = transforms.Compose([transforms.ToTensor(),transforms.Resize((180, 320),antialias=True)])
     images = transform(image)
     images = images.unsqueeze(0)
     logger.log_debug("Images Shape: %s," + str(images.shape))
@@ -323,26 +323,26 @@ if __name__ == "__main__":
     # The FPN is designed to create feature pyramids from the backbone's output.
     # It combines feature maps from different levels (layers) to build multi-scale feature maps.
     # These combined features help in detecting objects at various scales.
-    """
+    backbone_out_channels = [
+        CONFIG["backbone"]["layer1"]["out_channels"],
+        CONFIG["backbone"]["layer2"]["out_channels"],
+        CONFIG["backbone"]["layer3"]["out_channels"],
+        CONFIG["backbone"]["layer4"]["out_channels"],
+    ]
     model_FeaturePyramidNetwork = FeaturePyramidNetwork
-    pyramid_features = model_FeaturePyramidNetwork(backbone_out_channels=pyramid_features)
-    logger.log_debug("FeaturePyramidNetwork0: " + str(pyramid_features[0].shape))
-    logger.log_debug("FeaturePyramidNetwork1: " + str(pyramid_features[1].shape))
-    logger.log_debug("FeaturePyramidNetwork2: " + str(pyramid_features[2].shape))
-    logger.log_debug("FeaturePyramidNetwork3: " + str(pyramid_features[3].shape))
-    """
+    pyramid_features = model_FeaturePyramidNetwork(backbone_out_channels=backbone_out_channels)
+
     # ***************** RoIAlignLayer *****************
     # This module aligns RoIs (Regions of Interest) of different sizes to a fixed size (pool_size) using feature 
     # maps from the FPN.
     # It uses the spatial scale of the feature maps to properly resize and align the RoIs.
     # It distributes the RoIs to different levels of the pyramid based on their size and aligns them accordingly.
-    model_RoIAlign = PyramidRoIAlign
-    rois = generate_full_image_rois(1,720,1280)
+    model_PyramidRoIAlign = PyramidRoIAlign
+    rois = generate_full_image_rois(1,180,320)
     logger.log_debug("rois: " + str(rois))
-    aligned_features = model_RoIAlign(rois,pyramid_features)
-
+    aligned_features = model_PyramidRoIAlign(rois,pyramid_features)
     #logger.log_debug("RoIAlign: " + str(aligned_features.shape))
-
+    
     # *************** SemanticLaneHead ****************
     # This head is designed to perform semantic segmentation for lane detection.
     # It consists of multiple convolutional layers followed by a deconvolutional (upsampling) layer and a final
@@ -350,39 +350,32 @@ if __name__ == "__main__":
     model_SemanticLaneHead = SemanticLaneHead
     mask_logits = model_SemanticLaneHead()
     #logger.log_debug("SemanticLaneHead: " + str(mask_logits.shape))
-
+    
     # ************** LaneDetectionModel ***************
     # This integrates all the components into a complete model.
     # The model takes images and RoIs as input, processes them through the backbone, FPN, RoI align,
     # and the semantic lane head to produce the final lane detection mask logits.
-    model_LaneDetectionModel = SemanticLaneHead()
+    model_LaneDetectionModel = LaneDetectionModel()
     output = model_LaneDetectionModel(images, rois)
     logger.log_debug("Output Shape: %s," + str(output.shape))
     target_size = (720,1280)
     predicted_mask = F.interpolate(output, size=target_size, mode='bilinear', align_corners=False)
     logger.log_debug("predicted_mask: %s," + str(predicted_mask.shape))   
-
+    
     # Prepare mask
-    transform_mask = transforms.Compose(
-        [
-            transforms.ToTensor(),  # Convert to tensor
-            #transforms.Resize((28, 28),antialias=True),  # Resize the image
-            transforms.Resize((320,180),antialias=True),  # Resize the image
-            #transforms.Resize((256,256),antialias=True),  # Resize the image
-        ]
-    )
+    transform_mask = transforms.Compose([transforms.ToTensor(), transforms.Resize((180,320),antialias=True)])
     masks = transform_mask(mask)
     masks = (masks == 1).type(torch.int)    
     masks = masks.unsqueeze(0)
     logger.log_debug("Minimum value: {" + str(torch.min(masks)) + "} // Maximum value: {" + str(torch.max(masks)) + "}")
     logger.log_debug("Masks Shape: %s," + str(masks.shape))
 
-
     # Convert the tensors to numpy arrays for plotting
     image_np = images[0].numpy().transpose(1, 2, 0)  # Convert to HWC format for plotting
     mask_np = masks[0].numpy().transpose(1, 2, 0)  # Convert to HWC format for plotting
-    predicted_mask_np = predicted_mask.detach().cpu().numpy()[0].transpose(1, 2, 0)
- 
+    #predicted_mask_np = predicted_mask.detach().cpu().numpy()[0].transpose(1, 2, 0)
+    predicted_mask_np = mask_np
+
      # Plot the image and mask
     fig, axes = plt.subplots(1, 3, figsize=(10, 5))
     axes[0].imshow(image_np)
