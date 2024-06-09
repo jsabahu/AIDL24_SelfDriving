@@ -1,18 +1,20 @@
 import torch
 from torch.utils import data
 from torchvision import transforms
-from dataloader import MaskDataset
+from dataloader import MaskDataset,Dataset_Mask_R_CNN
 from utils import read_yaml
 from logger import Logger
-from train import train_model, train_model2
+from train import train_model, train_mask_rCNN
 from utils import save_model
 from pathlib import Path
 from hyperparameters import hparams
 from torch.utils.data import DataLoader
 from models.model_ENet import ENet
-from models.model2 import LaneDetectionModel
+from models.model_mask_R_CNN import LaneDetectionModel
 import pandas as pd
 import os
+from utils import generate_full_image_rois
+import yaml
 
 logger = Logger()
 
@@ -98,13 +100,23 @@ def main_jordi():
     logger.log_debug("model is saved: {}".format(model_save_filename))
 
 
-def main_fermin():
+def main_mask_R_CNN():
+    # Load hyperparameters from config file
+    with open("configs\\config.yaml", "r") as file:
+        CONFIG = yaml.safe_load(file)
+
+    # Create logger
+    logger = Logger()
+
+    # Define device
+    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    logger.log_debug(f"Using device: {DEVICE}")
 
     # Define hyperparameters
     hparams = {
-        "batch_size": 16,
-        "lr": 0.05,
-        "weight_decay": 0.01,
+        "batch_size": 32,
+        "lr": 0.001,
+        #"weight_decay": 0.1,
         "num_epochs": 5,
     }
     
@@ -117,35 +129,28 @@ def main_fermin():
     )
 
     # Create training dataset and DataLoader
-    train_dataset = MaskDataset(
-        images_path=config["train"]["images_path"],
-        mask_path=config["train"]["labels_path"],
+    train_dataset = Dataset_Mask_R_CNN(
+        images_path=CONFIG["train"]["images_path"],
+        mask_path=CONFIG["train"]["labels_path"],
+        batch_size=hparams["batch_size"],
         transform=transform,
+        transform_mask=transform
     )
+
     train_loader = DataLoader(
         train_dataset, batch_size=hparams["batch_size"], shuffle=True
     )
 
     logger.log_info("Found train " + str(len(train_dataset)) + " samples")
 
-    # Create validation dataset and DataLoader
-    val_dataset = MaskDataset(
-        images_path=config["val"]["images_path"],
-        mask_path=config["val"]["labels_path"],
-        transform=transform,
-    )
-    val_loader = DataLoader(val_dataset, batch_size=hparams["batch_size"], shuffle=True)
-
-    logger.log_info("Found train " + str(len(val_dataset)) + " samples")
-
     # Create Model
+    rois = generate_full_image_rois((hparams["batch_size"]),320,180)
     model = LaneDetectionModel()
-    model.to(device=DEVICE)
-    model = train_model2(hparams, train_loader, DEVICE)
+    train_mask_rCNN(model, hparams, train_loader, rois, DEVICE).to(device=DEVICE)
 
 if __name__ == "__main__":
     check = False
     if check:
         main_jordi()
     else:
-        main_fermin()
+        main_mask_R_CNN()
