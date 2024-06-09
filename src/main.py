@@ -124,7 +124,7 @@ def main_mask_R_CNN():
     transform = transforms.Compose(
         [
             transforms.ToTensor(),  # Convert to tensor
-            transforms.Resize((320, 180),antialias=True),  # Resize the image
+            transforms.Resize((180, 320),antialias=True),  # Resize the image
         ]
     )
 
@@ -144,7 +144,7 @@ def main_mask_R_CNN():
     logger.log_info("Found train " + str(len(train_dataset)) + " samples")
 
     # Create Model
-    rois = generate_full_image_rois((hparams["batch_size"]),320,180)
+    rois = generate_full_image_rois((hparams["batch_size"]),180,320)
     model = LaneDetectionModel()
     train_mask_rCNN(model, hparams, train_loader, rois, DEVICE).to(device=DEVICE)
 
