@@ -1,7 +1,7 @@
 import torch
 from torch.utils import data
 from torchvision import transforms
-from dataloader import MaskDataset,Dataset_Mask_R_CNN
+from dataloader import MaskDataset, Dataset_Mask_R_CNN
 from utils import read_yaml
 from logger import Logger
 from train import train_model, train_mask_rCNN
@@ -29,6 +29,7 @@ try:
 except Exception as e:
     logger.log_error(f"Failed to read configuration from {config_path}: {e}")
     raise
+
 
 def main_jordi():
     # Define hyperparameters
@@ -102,7 +103,7 @@ def main_jordi():
 
 def main_mask_R_CNN():
     # Load hyperparameters from config file
-    with open("configs\\config.yaml", "r") as file:
+    with open("configs/config.yaml", "r") as file:
         CONFIG = yaml.safe_load(file)
 
     # Create logger
@@ -116,15 +117,15 @@ def main_mask_R_CNN():
     hparams = {
         "batch_size": 32,
         "lr": 0.001,
-        #"weight_decay": 0.1,
+        # "weight_decay": 0.1,
         "num_epochs": 5,
     }
-    
+
     # Define Transform
     transform = transforms.Compose(
         [
             transforms.ToTensor(),  # Convert to tensor
-            transforms.Resize((180, 320),antialias=True),  # Resize the image
+            transforms.Resize((180, 320), antialias=True),  # Resize the image
         ]
     )
 
@@ -134,7 +135,7 @@ def main_mask_R_CNN():
         mask_path=CONFIG["train"]["labels_path"],
         batch_size=hparams["batch_size"],
         transform=transform,
-        transform_mask=transform
+        transform_mask=transform,
     )
 
     train_loader = DataLoader(
@@ -144,9 +145,10 @@ def main_mask_R_CNN():
     logger.log_info("Found train " + str(len(train_dataset)) + " samples")
 
     # Create Model
-    rois = generate_full_image_rois((hparams["batch_size"]),180,320)
+    rois = generate_full_image_rois((hparams["batch_size"]), 180, 320).to(device=DEVICE)
     model = LaneDetectionModel()
     train_mask_rCNN(model, hparams, train_loader, rois, DEVICE).to(device=DEVICE)
+
 
 if __name__ == "__main__":
     check = False

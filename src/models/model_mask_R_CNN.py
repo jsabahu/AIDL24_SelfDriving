@@ -8,6 +8,7 @@ from torchvision.ops import RoIAlign
 with open("configs/config.yaml", "r") as file:
     CONFIG = yaml.safe_load(file)
 
+
 class CustomBackbone(nn.Module):
     def __init__(self, config=CONFIG):
         super(CustomBackbone, self).__init__()
@@ -145,7 +146,7 @@ class FeaturePyramidNetwork(nn.Module):
 
         return p1, p2, p3, p4
 
-  
+
 class PyramidRoIAlign(nn.Module):
     def __init__(self, pool_size, image_shape):
         super(PyramidRoIAlign, self).__init__()
@@ -171,16 +172,16 @@ class PyramidRoIAlign(nn.Module):
 
         pooled = []
         box_to_level = []
-        
+
         for i, level in enumerate(range(2, 6)):
             ix = roi_level == level
             if not ix.any():
                 continue
             ix = torch.nonzero(ix)[:, 0]
             level_boxes = boxes[ix, :]
-            
+
             box_to_level.append(ix)
-            
+
             level_boxes = level_boxes.detach()
             indices = level_boxes[:, 0].int()
             level_boxes = level_boxes[:, 1:]
@@ -191,7 +192,7 @@ class PyramidRoIAlign(nn.Module):
                 torch.cat([indices[:, None].float(), level_boxes], dim=1),
             )
             pooled.append(pooled_features)
-        
+
         pooled = torch.cat(pooled, dim=0)
         box_to_level = torch.cat(box_to_level, dim=0)
         _, box_to_level = torch.sort(box_to_level)
@@ -250,6 +251,7 @@ class SemanticLaneHead(nn.Module):
         x = self.mask_fcn_logits(x)
         return x
 
+
 # Model Integration
 class LaneDetectionModel(nn.Module):
     def __init__(self, config=CONFIG):
@@ -278,19 +280,23 @@ class LaneDetectionModel(nn.Module):
         mask_logits = F.sigmoid(mask_logits)
         return mask_logits
 
+
 # Example usage
 if __name__ == "__main__":
     import sys
     import os
+
     # Add parent directory to sys.path
-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+    sys.path.append(
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    )
     from logger import Logger
     from PIL import Image
     from torchvision import transforms
     import matplotlib.pyplot as plt
     from utils import generate_full_image_rois
-   
+
     # Create logger
     logger = Logger()
 
@@ -299,15 +305,25 @@ if __name__ == "__main__":
     logger.log_debug(f"Using device: {device}")
 
     # Load hyperparameters from config file
-    with open("configs\\config.yaml", "r") as file:
+    with open("configs/config.yaml", "r") as file:
         CONFIG = yaml.safe_load(file)
 
-    # Read Image & Mask Example  
-    image = Image.open("data\\bdd100k\\images\\100k\\train\\0000f77c-cb820c98.jpg").convert("RGB")  # Ensure image is in RGB mode
-    mask = Image.open("data\\bdd100k\\labels\\lane\\masks\\train\\0000f77c-cb820c98.png").convert("L")  # Convert mask to grayscale
-    
+    # Read Image & Mask Example
+    image = Image.open(
+        "data\\bdd100k\\images\\100k\\train\\0000f77c-cb820c98.jpg"
+    ).convert(
+        "RGB"
+    )  # Ensure image is in RGB mode
+    mask = Image.open(
+        "data\\bdd100k\\labels\\lane\\masks\\train\\0000f77c-cb820c98.png"
+    ).convert(
+        "L"
+    )  # Convert mask to grayscale
+
     # Prepare image
-    transform = transforms.Compose([transforms.ToTensor(),transforms.Resize((180, 320),antialias=True)])
+    transform = transforms.Compose(
+        [transforms.ToTensor(), transforms.Resize((180, 320), antialias=True)]
+    )
     images = transform(image)
     images = images.unsqueeze(0)
     logger.log_debug("Images Shape: %s," + str(images.shape))
@@ -317,7 +333,16 @@ if __name__ == "__main__":
     # It extracts feature maps from input images through a series of layers (conv1, layer1, layer2, layer3, layer4).
     model_CustomBackbone = CustomBackbone()
     pyramid_features = model_CustomBackbone(images)
-    logger.log_debug("Backbone Output Shapes: \n c1.shape: %s," + str(pyramid_features[0].shape) + " \n c2.shape: %s," + str(pyramid_features[1].shape)+ " \n c3.shape: %s," + str(pyramid_features[2].shape)+ " \n c4.shape: %s," + str(pyramid_features[3].shape))
+    logger.log_debug(
+        "Backbone Output Shapes: \n c1.shape: %s,"
+        + str(pyramid_features[0].shape)
+        + " \n c2.shape: %s,"
+        + str(pyramid_features[1].shape)
+        + " \n c3.shape: %s,"
+        + str(pyramid_features[2].shape)
+        + " \n c4.shape: %s,"
+        + str(pyramid_features[3].shape)
+    )
 
     # ************* FeaturePyramidNetwork *************
     # The FPN is designed to create feature pyramids from the backbone's output.
@@ -330,27 +355,29 @@ if __name__ == "__main__":
         CONFIG["backbone"]["layer4"]["out_channels"],
     ]
     model_FeaturePyramidNetwork = FeaturePyramidNetwork
-    pyramid_features = model_FeaturePyramidNetwork(backbone_out_channels=backbone_out_channels)
+    pyramid_features = model_FeaturePyramidNetwork(
+        backbone_out_channels=backbone_out_channels
+    )
 
     # ***************** RoIAlignLayer *****************
-    # This module aligns RoIs (Regions of Interest) of different sizes to a fixed size (pool_size) using feature 
+    # This module aligns RoIs (Regions of Interest) of different sizes to a fixed size (pool_size) using feature
     # maps from the FPN.
     # It uses the spatial scale of the feature maps to properly resize and align the RoIs.
     # It distributes the RoIs to different levels of the pyramid based on their size and aligns them accordingly.
     model_PyramidRoIAlign = PyramidRoIAlign
-    rois = generate_full_image_rois(1,180,320)
+    rois = generate_full_image_rois(1, 180, 320)
     logger.log_debug("rois: " + str(rois))
-    aligned_features = model_PyramidRoIAlign(rois,pyramid_features)
-    #logger.log_debug("RoIAlign: " + str(aligned_features.shape))
-    
+    aligned_features = model_PyramidRoIAlign(rois, pyramid_features)
+    # logger.log_debug("RoIAlign: " + str(aligned_features.shape))
+
     # *************** SemanticLaneHead ****************
     # This head is designed to perform semantic segmentation for lane detection.
     # It consists of multiple convolutional layers followed by a deconvolutional (upsampling) layer and a final
     # convolutional layer to produce the segmentation mask logits.
     model_SemanticLaneHead = SemanticLaneHead
     mask_logits = model_SemanticLaneHead()
-    #logger.log_debug("SemanticLaneHead: " + str(mask_logits.shape))
-    
+    # logger.log_debug("SemanticLaneHead: " + str(mask_logits.shape))
+
     # ************** LaneDetectionModel ***************
     # This integrates all the components into a complete model.
     # The model takes images and RoIs as input, processes them through the backbone, FPN, RoI align,
@@ -358,25 +385,37 @@ if __name__ == "__main__":
     model_LaneDetectionModel = LaneDetectionModel()
     output = model_LaneDetectionModel(images, rois)
     logger.log_debug("Output Shape: %s," + str(output.shape))
-    target_size = (720,1280)
-    predicted_mask = F.interpolate(output, size=target_size, mode='bilinear', align_corners=False)
-    logger.log_debug("predicted_mask: %s," + str(predicted_mask.shape))   
-    
+    target_size = (720, 1280)
+    predicted_mask = F.interpolate(
+        output, size=target_size, mode="bilinear", align_corners=False
+    )
+    logger.log_debug("predicted_mask: %s," + str(predicted_mask.shape))
+
     # Prepare mask
-    transform_mask = transforms.Compose([transforms.ToTensor(), transforms.Resize((180,320),antialias=True)])
+    transform_mask = transforms.Compose(
+        [transforms.ToTensor(), transforms.Resize((180, 320), antialias=True)]
+    )
     masks = transform_mask(mask)
-    masks = (masks == 1).type(torch.int)    
+    masks = (masks == 1).type(torch.int)
     masks = masks.unsqueeze(0)
-    logger.log_debug("Minimum value: {" + str(torch.min(masks)) + "} // Maximum value: {" + str(torch.max(masks)) + "}")
+    logger.log_debug(
+        "Minimum value: {"
+        + str(torch.min(masks))
+        + "} // Maximum value: {"
+        + str(torch.max(masks))
+        + "}"
+    )
     logger.log_debug("Masks Shape: %s," + str(masks.shape))
 
     # Convert the tensors to numpy arrays for plotting
-    image_np = images[0].numpy().transpose(1, 2, 0)  # Convert to HWC format for plotting
+    image_np = (
+        images[0].numpy().transpose(1, 2, 0)
+    )  # Convert to HWC format for plotting
     mask_np = masks[0].numpy().transpose(1, 2, 0)  # Convert to HWC format for plotting
-    #predicted_mask_np = predicted_mask.detach().cpu().numpy()[0].transpose(1, 2, 0)
+    # predicted_mask_np = predicted_mask.detach().cpu().numpy()[0].transpose(1, 2, 0)
     predicted_mask_np = mask_np
 
-     # Plot the image and mask
+    # Plot the image and mask
     fig, axes = plt.subplots(1, 3, figsize=(10, 5))
     axes[0].imshow(image_np)
     axes[0].set_title("Image")
