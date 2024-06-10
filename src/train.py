@@ -277,7 +277,7 @@ def train_mask_rCNN(model, hparams, train_loader, rois, device):
     logger.log_info("Train Optimizer")
 
     # Initialize loss function
-    criterion = F.binary_cross_entropy
+    criterion = F.binary_cross_entropy_with_logits
 
     # Initialize Parameters
     num_epoch = hparams["num_epochs"]
