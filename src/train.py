@@ -47,7 +47,7 @@ def train_single_epoch(model, train_loader, optimizer, device):
         output = output.reshape(-1)
         masks = masks.reshape(-1)
         # Compute loss
-        #loss = F.binary_cross_entropy_with_logits(output, masks)  # Calculate loss
+        # loss = F.binary_cross_entropy_with_logits(output, masks)  # Calculate loss
         loss = compute_loss(output, binary_label=masks)
         # Backward pass: compute gradients of the loss with respect to model parameters
         loss.backward()
@@ -204,7 +204,9 @@ def train_model2(hparams, train_loader, device):
     for epoch in range(num_epoch):
         # Train model for 1 epoch
         logger.log_info(f"Train Epoch {epoch+1}/{num_epoch}")
-        train_loss, train_acc = train_single_epoch(model, train_loader, optimizer, device)
+        train_loss, train_acc = train_single_epoch(
+            model, train_loader, optimizer, device
+        )
         logger.log_info(
             f"Train Epoch {epoch} loss={train_loss:.2f} acc={train_acc:.2f}"
         )
@@ -252,18 +254,26 @@ def compute_loss(output, binary_label, loss_type="FocalLoss"):
 
     return binary_loss
 
+
+def binary_accuracy(output, masks, threshold=0.5):
+    preds = (output >= threshold).float()
+    correct = (preds == masks).float()
+    acc = correct.sum() / len(correct)
+    return acc
+
+
 def train_mask_rCNN(model, hparams, train_loader, rois, device):
-    
-    #Model in train mode
+
+    model.to(device)  # Move model to device
+    # Model in train mode
     model.train()
 
-    # Initialize optimizer (possibility to create specific optimizer call from utils)
-    # Self-drive examples found use the Adam optimizer
+    # Initialize optimizer
     optimizer = optim.Adam(
         model.parameters(),
         lr=hparams["lr"],
-        #weight_decay=hparams["weight_decay"],
-    )  # Note use weight_decay to prevent overfitting
+        # weight_decay=hparams["weight_decay"],  # Uncomment if weight_decay is needed
+    )
     logger.log_info("Train Optimizer")
 
     # Initialize loss function
@@ -272,7 +282,7 @@ def train_mask_rCNN(model, hparams, train_loader, rois, device):
     # Initialize Parameters
     num_epoch = hparams["num_epochs"]
     tr_loss, tr_acc = [], []
-        
+
     for epoch in range(num_epoch):
         # Train model for 1 epoch
         logger.log_info(f"Train Epoch {epoch+1}/{num_epoch}")
@@ -286,12 +296,16 @@ def train_mask_rCNN(model, hparams, train_loader, rois, device):
             # Forward batch of images through the network
             output = model(images, rois)
             # Define the weights for the RGB to grayscale conversion
-            weights = torch.tensor([0.2989, 0.5870, 0.1140], device=device).view(1, 3, 1, 1)
+            weights = torch.tensor([0.2989, 0.5870, 0.1140], device=device).view(
+                1, 3, 1, 1
+            )
             # Apply the weights and sum across the channel dimension
             output = (output * weights).sum(dim=1, keepdim=True)
             # Reshape output & masks
             target_size = (320, 180)
-            output = F.interpolate(output, size=target_size, mode='bilinear', align_corners=False)
+            output = F.interpolate(
+                output, size=target_size, mode="bilinear", align_corners=False
+            )
             output = output.reshape(-1).type(torch.float)
             masks = masks.reshape(-1).type(torch.float)  # Convert masks to float
             # Compute loss
@@ -300,18 +314,20 @@ def train_mask_rCNN(model, hparams, train_loader, rois, device):
             loss.backward()
             # Update parameters of the network
             optimizer.step()
-            # Compute metrics 
+            # Compute metrics
             acc = binary_accuracy(output, masks, threshold=0.5)
             # Add loss & acc to list
             tr_loss_temp.append(loss.item())
             tr_acc_temp.append(acc.item())
         tr_mean_loss = np.mean(tr_loss_temp)
         tr_mean_acc = np.mean(tr_acc_temp)
-        logger.log_info(f"Train Epoch {epoch+1} loss={tr_mean_loss:.2f} acc={tr_mean_acc:.2f}")
+        logger.log_info(
+            f"Train Epoch {epoch+1} loss={tr_mean_loss:.2f} acc={tr_mean_acc:.2f}"
+        )
         tr_loss.append(tr_mean_loss)
         tr_acc.append(tr_mean_acc)
 
-    # Plot loast & Accuracy
+    # Plot Loss & Accuracy
     plt.figure(figsize=(10, 8))
     plt.subplot(2, 1, 1)
     plt.xlabel("Epoch")
@@ -325,4 +341,3 @@ def train_mask_rCNN(model, hparams, train_loader, rois, device):
     plt.legend()
     plt.show()
     return model
-

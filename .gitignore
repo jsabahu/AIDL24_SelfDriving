@@ -25,3 +25,5 @@ logs/
 /models/
 runs/
 *.pth
+src/models/logger.py
+src/models/utils.py
