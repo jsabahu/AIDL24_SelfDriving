@@ -277,7 +277,6 @@ class LaneDetectionModel(nn.Module):
         pyramid_features = self.fpn(features)
         aligned_features = self.pyramid_roi_align(rois, pyramid_features)
         mask_logits = self.mask_head(aligned_features)
-        mask_logits = F.sigmoid(mask_logits)
         return mask_logits
 
 
