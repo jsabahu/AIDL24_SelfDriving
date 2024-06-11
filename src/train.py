@@ -302,9 +302,8 @@ def train_mask_rCNN(model, hparams, train_loader, rois, device):
             # Apply the weights and sum across the channel dimension
             output = (output * weights).sum(dim=1, keepdim=True)
             # Reshape output & masks
-            target_size = (320, 180)
             output = F.interpolate(
-                output, size=target_size, mode="bilinear", align_corners=False
+                output, size=hparams["target_size"], mode="bilinear", align_corners=False
             )
             output = output.reshape(-1).type(torch.float)
             masks = masks.reshape(-1).type(torch.float)  # Convert masks to float
@@ -327,17 +326,4 @@ def train_mask_rCNN(model, hparams, train_loader, rois, device):
         tr_loss.append(tr_mean_loss)
         tr_acc.append(tr_mean_acc)
 
-    # Plot Loss & Accuracy
-    plt.figure(figsize=(10, 8))
-    plt.subplot(2, 1, 1)
-    plt.xlabel("Epoch")
-    plt.ylabel("Loss")
-    plt.plot(tr_loss, label="loss train")
-    plt.legend()
-    plt.subplot(2, 1, 2)
-    plt.xlabel("Epoch")
-    plt.ylabel("Accuracy [%]")
-    plt.plot(tr_acc, label="acc train")
-    plt.legend()
-    plt.show()
-    return model
+    return tr_loss, tr_acc
