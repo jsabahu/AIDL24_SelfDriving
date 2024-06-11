@@ -294,7 +294,7 @@ if __name__ == "__main__":
     from PIL import Image
     from torchvision import transforms
     import matplotlib.pyplot as plt
-    from utils import generate_full_image_rois
+    from utils import generate_full_image_rois, show_sample
 
     # Create logger
     logger = Logger()
@@ -308,20 +308,15 @@ if __name__ == "__main__":
         CONFIG = yaml.safe_load(file)
 
     # Read Image & Mask Example
-    image = Image.open(
-        "data\\bdd100k\\images\\100k\\train\\0000f77c-cb820c98.jpg"
-    ).convert(
-        "RGB"
-    )  # Ensure image is in RGB mode
-    mask = Image.open(
-        "data\\bdd100k\\labels\\lane\\masks\\train\\0000f77c-cb820c98.png"
-    ).convert(
-        "L"
-    )  # Convert mask to grayscale
+    image_path = "data\\bdd100k\\images\\100k\\train\\5553c996-c8317c63.jpg"
+    mask_path = "data\\bdd100k\\labels\\lane\\masks\\train\\5553c996-c8317c63.png"
+    image = Image.open(image_path).convert("RGB")  # Ensure image is in RGB mode
+    mask = Image.open(mask_path).convert("L")  # Convert mask to grayscale
 
     # Prepare image
+    target_size = (180, 320)
     transform = transforms.Compose(
-        [transforms.ToTensor(), transforms.Resize((180, 320), antialias=True)]
+        [transforms.ToTensor(), transforms.Resize(target_size, antialias=True)]
     )
     images = transform(image)
     images = images.unsqueeze(0)
@@ -364,7 +359,7 @@ if __name__ == "__main__":
     # It uses the spatial scale of the feature maps to properly resize and align the RoIs.
     # It distributes the RoIs to different levels of the pyramid based on their size and aligns them accordingly.
     model_PyramidRoIAlign = PyramidRoIAlign
-    rois = generate_full_image_rois(1, 180, 320)
+    rois = generate_full_image_rois(1, target_size)
     logger.log_debug("rois: " + str(rois))
     aligned_features = model_PyramidRoIAlign(rois, pyramid_features)
     # logger.log_debug("RoIAlign: " + str(aligned_features.shape))
@@ -382,47 +377,4 @@ if __name__ == "__main__":
     # The model takes images and RoIs as input, processes them through the backbone, FPN, RoI align,
     # and the semantic lane head to produce the final lane detection mask logits.
     model_LaneDetectionModel = LaneDetectionModel()
-    output = model_LaneDetectionModel(images, rois)
-    logger.log_debug("Output Shape: %s," + str(output.shape))
-    target_size = (720, 1280)
-    predicted_mask = F.interpolate(
-        output, size=target_size, mode="bilinear", align_corners=False
-    )
-    logger.log_debug("predicted_mask: %s," + str(predicted_mask.shape))
-
-    # Prepare mask
-    transform_mask = transforms.Compose(
-        [transforms.ToTensor(), transforms.Resize((180, 320), antialias=True)]
-    )
-    masks = transform_mask(mask)
-    masks = (masks == 1).type(torch.int)
-    masks = masks.unsqueeze(0)
-    logger.log_debug(
-        "Minimum value: {"
-        + str(torch.min(masks))
-        + "} // Maximum value: {"
-        + str(torch.max(masks))
-        + "}"
-    )
-    logger.log_debug("Masks Shape: %s," + str(masks.shape))
-
-    # Convert the tensors to numpy arrays for plotting
-    image_np = (
-        images[0].numpy().transpose(1, 2, 0)
-    )  # Convert to HWC format for plotting
-    mask_np = masks[0].numpy().transpose(1, 2, 0)  # Convert to HWC format for plotting
-    # predicted_mask_np = predicted_mask.detach().cpu().numpy()[0].transpose(1, 2, 0)
-    predicted_mask_np = mask_np
-
-    # Plot the image and mask
-    fig, axes = plt.subplots(1, 3, figsize=(10, 5))
-    axes[0].imshow(image_np)
-    axes[0].set_title("Image")
-    axes[0].axis("off")
-    axes[1].imshow(mask_np)
-    axes[1].set_title("Mask")
-    axes[1].axis("off")
-    axes[2].imshow(predicted_mask_np)
-    axes[2].set_title("Predicted Mask")
-    axes[2].axis("off")
-    plt.show()
+    show_sample(model_LaneDetectionModel,image_path,mask_path,rois,device)
