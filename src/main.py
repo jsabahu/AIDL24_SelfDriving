@@ -13,8 +13,10 @@ from models.model_ENet import ENet
 from models.model_mask_R_CNN import LaneDetectionModel
 import pandas as pd
 import os
-from utils import generate_full_image_rois
+from utils import generate_full_image_rois, show_sample
 import yaml
+import matplotlib.pyplot as plt
+from eval import eval_mask_rCNN
 
 logger = Logger()
 
@@ -118,14 +120,17 @@ def main_mask_R_CNN():
         "batch_size": 32,
         "lr": 0.001,
         # "weight_decay": 0.1,
-        "num_epochs": 5,
+        "num_epochs": 1,
+        "target_size": (180, 320),
     }
 
     # Define Transform
     transform = transforms.Compose(
         [
             transforms.ToTensor(),  # Convert to tensor
-            transforms.Resize((180, 320), antialias=True),  # Resize the image
+            transforms.Resize(
+                hparams["target_size"], antialias=True
+            ),  # Resize the image
         ]
     )
 
@@ -138,16 +143,78 @@ def main_mask_R_CNN():
         transform_mask=transform,
     )
 
+    # Create training dataset and DataLoader
+    eval_dataset = Dataset_Mask_R_CNN(
+        images_path=CONFIG["val"]["images_path"],
+        mask_path=CONFIG["val"]["labels_path"],
+        batch_size=hparams["batch_size"],
+        transform=transform,
+        transform_mask=transform,
+    )
+
+    # Create training dataset and DataLoader
+    eval_dataset = Dataset_Mask_R_CNN(
+        images_path=CONFIG["val"]["images_path"],
+        mask_path=CONFIG["val"]["labels_path"],
+        batch_size=hparams["batch_size"],
+        transform=transform,
+        transform_mask=transform,
+    )
+
+    # Create training dataset and DataLoader
+    eval_dataset = Dataset_Mask_R_CNN(
+        images_path=CONFIG["val"]["images_path"],
+        mask_path=CONFIG["val"]["labels_path"],
+        batch_size=hparams["batch_size"],
+        transform=transform,
+        transform_mask=transform,
+    )
+
     train_loader = DataLoader(
         train_dataset, batch_size=hparams["batch_size"], shuffle=True
     )
 
+    eval_loader = DataLoader(
+        eval_dataset, batch_size=hparams["batch_size"], shuffle=True
+    )
+
     logger.log_info("Found train " + str(len(train_dataset)) + " samples")
+    logger.log_info("Found eval " + str(len(eval_dataset)) + " samples")
 
     # Create Model
-    rois = generate_full_image_rois((hparams["batch_size"]), 180, 320).to(device=DEVICE)
+    rois = generate_full_image_rois((hparams["batch_size"]), hparams["target_size"]).to(
+        device=DEVICE
+    )
     model = LaneDetectionModel()
-    train_mask_rCNN(model, hparams, train_loader, rois, DEVICE).to(device=DEVICE)
+    # Train Model
+    tr_loss, tr_acc = train_mask_rCNN(model, hparams, train_loader, rois, DEVICE)
+    # Eval Model
+    # eval_loss, eval_acc = eval_mask_rCNN(model, hparams, eval_loader, rois, DEVICE)
+    # logger.log_info("Eval Loss: " + str(eval_loss) + " / Eval Acc:" + str(eval_acc))
+
+    # Plot loast & Accuracy
+    plt.figure(figsize=(10, 8))
+    plt.subplot(2, 1, 1)
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.plot(tr_loss, label="loss train")
+    plt.legend()
+    plt.subplot(2, 1, 2)
+    plt.xlabel("Epoch")
+    plt.ylabel("Accuracy [%]")
+    plt.plot(tr_acc, label="acc train")
+    plt.legend()
+    plt.show()
+
+    image_path = "data\\bdd100k\\images\\100k\\train\\5553c996-c8317c63.jpg"
+    mask_path = "data\\bdd100k\\labels\\lane\\masks\\train\\5553c996-c8317c63.png"
+    show_sample(
+        model,
+        image_path,
+        mask_path,
+        generate_full_image_rois(1, hparams["target_size"]),
+        DEVICE,
+    )
 
 
 if __name__ == "__main__":
