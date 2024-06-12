@@ -44,7 +44,7 @@ def eval_mask_rCNN(model, hparams, eval_loader, rois, device):
     for epoch in range(num_epoch):
         # Train model for 1 epoch
         ev_loss_temp, ev_acc_temp = [], []
-        for images, masks in enumerate(eval_loader):
+        for Image_cnt, (images, masks) in enumerate(eval_loader):
             # Move data to device
             images, masks = images.to(device), masks.to(device)
             # Forward batch of images through the network
