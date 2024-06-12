@@ -118,9 +118,9 @@ def main_mask_R_CNN():
     # Define hyperparameters
     hparams = {
         "batch_size": 32,
-        "lr": 0.001,
+        "lr": 0.01,
         # "weight_decay": 0.1,
-        "num_epochs": 1,
+        "num_epochs": 30,
         "target_size": (180, 320),
     }
 
@@ -186,11 +186,12 @@ def main_mask_R_CNN():
         device=DEVICE
     )
     model = LaneDetectionModel()
+
     # Train Model
     tr_loss, tr_acc = train_mask_rCNN(model, hparams, train_loader, rois, DEVICE)
     # Eval Model
-    # eval_loss, eval_acc = eval_mask_rCNN(model, hparams, eval_loader, rois, DEVICE)
-    # logger.log_info("Eval Loss: " + str(eval_loss) + " / Eval Acc:" + str(eval_acc))
+    eval_loss, eval_acc = eval_mask_rCNN(model, hparams, eval_loader, rois, DEVICE)
+    logger.log_info("Eval Loss: " + str(eval_loss) + " / Eval Acc:" + str(eval_acc))
 
     # Plot loast & Accuracy
     plt.figure(figsize=(10, 8))
@@ -206,8 +207,8 @@ def main_mask_R_CNN():
     plt.legend()
     plt.show()
 
-    image_path = "data\\bdd100k\\images\\100k\\train\\5553c996-c8317c63.jpg"
-    mask_path = "data\\bdd100k\\labels\\lane\\masks\\train\\5553c996-c8317c63.png"
+    image_path = "data\\bdd100k\\images\\100k\\val\\fdc07c32-1af45031.jpg"
+    mask_path = "data\\bdd100k\\labels\\lane\\masks\\val\\fdc07c32-1af45031.png"
     show_sample(
         model,
         image_path,
