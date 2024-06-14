@@ -5,18 +5,13 @@ import torch.optim as optim
 import numpy as np
 from torcheval.metrics.functional import binary_accuracy
 from utils import read_yaml
-from hyperparameters import hparams
 from utils import binary_accuracy_with_logits, save_model
-from models.model_ENet import ENet
 from models.modelDebug import SimpleSegmentationModel  # Debug Model
-from torchvision import transforms
 from logger import Logger
 from torch.utils.tensorboard import SummaryWriter
 import matplotlib.pyplot as plt
 from time import time
 import copy
-from loss import FocalLoss, DiscriminativeLoss
-import torch.nn as nn
 from models.LaneNet.train_lanenet import compute_loss
 
 # Initialize tensorboard writer and logger
@@ -77,10 +72,6 @@ def single_epoch_lane_model(
         model.train()
     elif phase == "val":
         model.eval()
-
-    # running_loss = 0.0
-    # running_loss_b = 0.0
-    # running_loss_i = 0.0
 
     accs, losses, losses_b, losses_i = (
         [],
