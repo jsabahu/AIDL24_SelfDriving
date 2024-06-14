@@ -7,7 +7,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from loss import DiscriminativeLoss
 from .backbone.UNet import UNet_Encoder, UNet_Decoder
 from .backbone.ENet import ENet_Encoder, ENet_Decoder
 from .backbone.deeplabv3_plus.deeplabv3plus import (
