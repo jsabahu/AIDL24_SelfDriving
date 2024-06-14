@@ -25,3 +25,4 @@ logs/
 /models/
 runs/
 *.pth
+test_output/
