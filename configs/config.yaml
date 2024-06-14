@@ -9,6 +9,7 @@ model:
   input_channels: 3       # Number of input channels (RGB image has 3 channels)
   num_classes: 3          # Number of object classes to be predicted
   num_anchors: 9          # Number of anchor boxes used in the detection head
+  image_shape: [256, 256, 3]
 
 backbone:
   conv1:

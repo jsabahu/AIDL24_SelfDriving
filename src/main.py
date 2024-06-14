@@ -1,22 +1,28 @@
 import torch
 from torch.utils import data
 from torchvision import transforms
-from dataloader import MaskDataset, TusimpleSet
+from dataloader import MaskDataset, TusimpleSet, Dataset_Mask_R_CNN
 from utils import read_yaml
 from logger import Logger
-from train import train_model, train_model2
+from train import train_model, train_mask_rCNN
 from hyperparameters import hparams
 from torch.utils.data import DataLoader
 from models.model_ENet import ENet
+from models.model_mask_R_CNN import LaneDetectionModel
 import pandas as pd
 import os
 from utils import Rescale
 from models.LaneNet.LaneNet import LaneNet
 import time
+from utils import generate_full_image_rois, show_sample
+import yaml
+import matplotlib.pyplot as plt
+from eval import eval_mask_rCNN
 
 logger = Logger()
 
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+logger.log_debug(f"Using device: {DEVICE}")
 
 # Read configuration
 config_path = "configs/config.yaml"
@@ -131,69 +137,106 @@ def main_jordi():
     logger.log_debug("model is saved: {}".format(model_save_filename))
 
 
-def main_fermin():
+def main_mask_R_CNN():
+    # Load hyperparameters from config file
+    with open("configs/config.yaml", "r") as file:
+        CONFIG = yaml.safe_load(file)
+
+    # Create logger
+    logger = Logger()
+
+    # Define device
+    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    logger.log_debug(f"Using device: {DEVICE}")
+
+    # Define hyperparameters
+    hparams = {
+        "batch_size": 32,
+        "lr": 0.0001,
+        # "weight_decay": 0.1,
+        "num_epochs": 15,
+        "target_size": (180, 320),
+    }
 
     # Define Transform
-    Transform = transforms.Compose(
+    transform = transforms.Compose(
         [
             transforms.ToTensor(),  # Convert to tensor
             transforms.Resize(
-                (
-                    config["dataloader"]["resize_width"],
-                    config["dataloader"]["resize_width"],
-                ),
-                antialias=True,
+                hparams["target_size"], antialias=True
             ),  # Resize the image
         ]
     )
 
-    # Create my_dataset
-    my_dataset = MyDataset2(
-        images_path=config["dataloader"]["images_path"],
-        mask_path=config["dataloader"]["mask_path"],
-        transform=Transform,
-    )
-    logger.log_info("Found " + str(len(my_dataset)) + " samples")
-
-    # Split in train, eval and test data
-    val_samples = int(0.40 * len(my_dataset))
-    test_samples = int(0.40 * len(my_dataset))
-    train_samples = len(my_dataset) - val_samples - test_samples
-
-    # Create train, eval and test dataset
-    train_dataset, val_dataset, test_dataset = data.random_split(
-        dataset=my_dataset,
-        lengths=[train_samples, val_samples, test_samples],
-        generator=torch.Generator().manual_seed(42),
-    )
-    logger.log_info(
-        "Samples split as follows: Train = "
-        + str(train_samples)
-        + " \ Validate = "
-        + str(val_samples)
-        + " \ Test = "
-        + str(test_samples)
+    # Create training dataset and DataLoader
+    train_dataset = Dataset_Mask_R_CNN(
+        images_path=CONFIG["train"]["images_path"],
+        mask_path=CONFIG["train"]["labels_path"],
+        batch_size=hparams["batch_size"],
+        transform=transform,
+        transform_mask=transform,
     )
 
-    # Create train, eval and test dataloader
-    train_loader = data.DataLoader(
-        train_dataset, batch_size=config["dataloader"]["batch_size"], shuffle=True
-    )
-    val_loader = data.DataLoader(
-        val_dataset, batch_size=config["dataloader"]["batch_size"]
-    )
-    test_loader = data.DataLoader(
-        test_dataset, batch_size=config["dataloader"]["batch_size"]
+    # Create training dataset and DataLoader
+    eval_dataset = Dataset_Mask_R_CNN(
+        images_path=CONFIG["val"]["images_path"],
+        mask_path=CONFIG["val"]["labels_path"],
+        batch_size=hparams["batch_size"],
+        transform=transform,
+        transform_mask=transform,
     )
 
-    logger.log_info("Start Trainning")
-    my_model = train_model2(hparams, train_loader)
-    logger.log_info("Train Finished")
+    train_loader = DataLoader(
+        train_dataset, batch_size=hparams["batch_size"], shuffle=True
+    )
+
+    eval_loader = DataLoader(
+        eval_dataset, batch_size=hparams["batch_size"], shuffle=True
+    )
+
+    logger.log_info("Found train " + str(len(train_dataset)) + " samples")
+    logger.log_info("Found eval " + str(len(eval_dataset)) + " samples")
+
+    # Create Model
+    rois = generate_full_image_rois((hparams["batch_size"]), hparams["target_size"]).to(
+        device=DEVICE
+    )
+    model = LaneDetectionModel()
+
+    # Train Model
+    tr_loss, tr_acc = train_mask_rCNN(model, hparams, train_loader, rois, DEVICE)
+    # Eval Model
+    eval_loss, eval_acc = eval_mask_rCNN(model, hparams, eval_loader, rois, DEVICE)
+    logger.log_info("Eval Loss: " + str(eval_loss) + " / Eval Acc:" + str(eval_acc))
+
+    # Plot loast & Accuracy
+    plt.figure(figsize=(10, 8))
+    plt.subplot(2, 1, 1)
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.plot(tr_loss, label="loss train")
+    plt.legend()
+    plt.subplot(2, 1, 2)
+    plt.xlabel("Epoch")
+    plt.ylabel("Accuracy [%]")
+    plt.plot(tr_acc, label="acc train")
+    plt.legend()
+    plt.show()
+
+    image_path = "data\\bdd100k\\images\\100k\\val\\fdc07c32-1af45031.jpg"
+    mask_path = "data\\bdd100k\\labels\\lane\\masks\\val\\fdc07c32-1af45031.png"
+    show_sample(
+        model,
+        image_path,
+        mask_path,
+        generate_full_image_rois(1, hparams["target_size"]),
+        DEVICE,
+    )
 
 
 if __name__ == "__main__":
-    check = True
+    check = False
     if check:
         main_jordi()
     else:
-        main_fermin()
+        main_mask_R_CNN()

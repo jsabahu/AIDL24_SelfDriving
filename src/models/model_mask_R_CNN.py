@@ -3,7 +3,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torchvision.ops import RoIAlign
-from logger import Logger
 
 # Load hyperparameters from config file
 with open("configs/config.yaml", "r") as file:
@@ -128,13 +127,17 @@ class FeaturePyramidNetwork(nn.Module):
             padding=config["fpn"]["smooth"]["padding"],
         )
 
+    def _resize_add(self, x, target_size):
+        x = F.interpolate(x, size=target_size[2:], mode="nearest")
+        return x
+
     def forward(self, x):
         c1, c2, c3, c4 = x
 
         p4 = self.lateral4(c4)
-        p3 = self.lateral3(c3) + F.interpolate(p4, scale_factor=2, mode="nearest")
-        p2 = self.lateral2(c2) + F.interpolate(p3, scale_factor=2, mode="nearest")
-        p1 = self.lateral1(c1) + F.interpolate(p2, scale_factor=2, mode="nearest")
+        p3 = self.lateral3(c3) + self._resize_add(p4, c3.size())
+        p2 = self.lateral2(c2) + self._resize_add(p3, c2.size())
+        p1 = self.lateral1(c1) + self._resize_add(p2, c1.size())
 
         p4 = self.smooth4(p4)
         p3 = self.smooth3(p3)
@@ -199,7 +202,7 @@ class PyramidRoIAlign(nn.Module):
 
 
 class SemanticLaneHead(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config=CONFIG):
         super(SemanticLaneHead, self).__init__()
         in_channels = config["semantic_lane_head"]["in_channels"]
         num_classes = config["model"]["num_classes"]
@@ -277,22 +280,101 @@ class LaneDetectionModel(nn.Module):
         return mask_logits
 
 
+# Example usage
 if __name__ == "__main__":
-    logger = Logger(log_file="logfile.log", level="debug")
-    # Example usage
-    config = CONFIG
+    import sys
+    import os
 
-    # Initialize the complete model
-    model = LaneDetectionModel(config=config)
+    # Add parent directory to sys.path
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+    sys.path.append(
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    )
+    from logger import Logger
+    from PIL import Image
+    from torchvision import transforms
+    import matplotlib.pyplot as plt
+    from utils import generate_full_image_rois, show_sample
 
-    # Generate an example input image and ROIs
-    input_images = torch.randn(1, 3, 256, 256)
-    rois = torch.tensor(
-        [[0, 50, 50, 150, 150], [0, 30, 30, 100, 100]], dtype=torch.float32
+    # Create logger
+    logger = Logger()
+
+    # Define device
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    logger.log_debug(f"Using device: {device}")
+
+    # Load hyperparameters from config file
+    with open("configs/config.yaml", "r") as file:
+        CONFIG = yaml.safe_load(file)
+
+    # Read Image & Mask Example
+    image_path = "data\\bdd100k\\images\\100k\\train\\5553c996-c8317c63.jpg"
+    mask_path = "data\\bdd100k\\labels\\lane\\masks\\train\\5553c996-c8317c63.png"
+    image = Image.open(image_path).convert("RGB")  # Ensure image is in RGB mode
+    mask = Image.open(mask_path).convert("L")  # Convert mask to grayscale
+
+    # Prepare image
+    target_size = (180, 320)
+    transform = transforms.Compose(
+        [transforms.ToTensor(), transforms.Resize(target_size, antialias=True)]
+    )
+    images = transform(image)
+    images = images.unsqueeze(0)
+    logger.log_debug("Images Shape: %s," + str(images.shape))
+
+    # ***************** CustomBackbone ****************
+    # This network is built using several convolutional layers, batch normalization, and ReLU activations.
+    # It extracts feature maps from input images through a series of layers (conv1, layer1, layer2, layer3, layer4).
+    model_CustomBackbone = CustomBackbone()
+    pyramid_features = model_CustomBackbone(images)
+    logger.log_debug(
+        "Backbone Output Shapes: \n c1.shape: %s,"
+        + str(pyramid_features[0].shape)
+        + " \n c2.shape: %s,"
+        + str(pyramid_features[1].shape)
+        + " \n c3.shape: %s,"
+        + str(pyramid_features[2].shape)
+        + " \n c4.shape: %s,"
+        + str(pyramid_features[3].shape)
     )
 
-    # Pass the input image and ROIs through the model
-    output = model(input_images, rois)
+    # ************* FeaturePyramidNetwork *************
+    # The FPN is designed to create feature pyramids from the backbone's output.
+    # It combines feature maps from different levels (layers) to build multi-scale feature maps.
+    # These combined features help in detecting objects at various scales.
+    backbone_out_channels = [
+        CONFIG["backbone"]["layer1"]["out_channels"],
+        CONFIG["backbone"]["layer2"]["out_channels"],
+        CONFIG["backbone"]["layer3"]["out_channels"],
+        CONFIG["backbone"]["layer4"]["out_channels"],
+    ]
+    model_FeaturePyramidNetwork = FeaturePyramidNetwork
+    pyramid_features = model_FeaturePyramidNetwork(
+        backbone_out_channels=backbone_out_channels
+    )
 
-    # Print the output shape of the model
-    logger.log_info(f"Lane Detection Model Output Shape: {output.shape}")
+    # ***************** RoIAlignLayer *****************
+    # This module aligns RoIs (Regions of Interest) of different sizes to a fixed size (pool_size) using feature
+    # maps from the FPN.
+    # It uses the spatial scale of the feature maps to properly resize and align the RoIs.
+    # It distributes the RoIs to different levels of the pyramid based on their size and aligns them accordingly.
+    model_PyramidRoIAlign = PyramidRoIAlign
+    rois = generate_full_image_rois(1, target_size)
+    logger.log_debug("rois: " + str(rois))
+    aligned_features = model_PyramidRoIAlign(rois, pyramid_features)
+    # logger.log_debug("RoIAlign: " + str(aligned_features.shape))
+
+    # *************** SemanticLaneHead ****************
+    # This head is designed to perform semantic segmentation for lane detection.
+    # It consists of multiple convolutional layers followed by a deconvolutional (upsampling) layer and a final
+    # convolutional layer to produce the segmentation mask logits.
+    model_SemanticLaneHead = SemanticLaneHead
+    mask_logits = model_SemanticLaneHead()
+    # logger.log_debug("SemanticLaneHead: " + str(mask_logits.shape))
+
+    # ************** LaneDetectionModel ***************
+    # This integrates all the components into a complete model.
+    # The model takes images and RoIs as input, processes them through the backbone, FPN, RoI align,
+    # and the semantic lane head to produce the final lane detection mask logits.
+    model_LaneDetectionModel = LaneDetectionModel()
+    show_sample(model_LaneDetectionModel,image_path,mask_path,rois,device)
