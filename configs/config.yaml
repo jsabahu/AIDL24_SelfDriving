@@ -64,23 +64,33 @@ semantic_lane_head:
     kernel_size: 1        # Kernel size for the final mask prediction layer
 
 dataloader:
-  batch_size: 64
+  batch_size: 4
   images_path: "data\\images"
   mask_path: "data\\mask"
   log_filename: 'app.log'
 
-train:
-  images_path: "data/bdd100k/images/100k/train"
-  labels_path: "data/bdd100k/labels/lane/masks/train"
+dataset:
+  bdd100k:
+    train:
+      images_path: "data/bdd100k/images/100k/train"
+      labels_path: "data/bdd100k/labels/lane/masks/train"
+    val:
+      images_path: "data/bdd100k/images/100k/val"
+      labels_path: "data/bdd100k/labels/lane/masks/val"
+  tusimple:
+    train:
+      dir: "data/TuSimpleDataset/training"
+    test:
+      dir: "data/TuSimpleDataset/testing"
+      images_path: "data/TuSimpleDataset/testing/gt_image"
+
 
 main:
   log_filename: "main.log"
-  save_model_path: "models/Lane_Model_ENet.pth"
   logs_dir: "logs/"
+  resize_height: "720"
+  resize_width: "1280"
 
-val:
-  images_path: "data/bdd100k/images/100k/val"
-  labels_path: "data/bdd100k/labels/lane/masks/val"
 
 resolution:
   720p: [720,1280]
