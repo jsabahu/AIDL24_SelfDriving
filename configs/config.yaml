@@ -1,0 +1,100 @@
+# config.yaml
+# dataloader:
+#   batch_size: 32
+#   num_workers: 4
+#   train_size: 0.8
+model:
+  hidden_units: 128       # Number of hidden units in certain layers (if applicable)
+  learning_rate: 0.001    # Learning rate for the optimizer
+  input_channels: 3       # Number of input channels (RGB image has 3 channels)
+  num_classes: 3          # Number of object classes to be predicted
+  num_anchors: 9          # Number of anchor boxes used in the detection head
+  image_shape: [256, 256, 3]
+
+backbone:
+  conv1:
+    out_channels: 64      # Number of output channels for the first convolutional layer
+    kernel_size: 7        # Kernel size for the first convolutional layer
+    stride: 2             # Stride for the first convolutional layer
+    padding: 3            # Padding for the first convolutional layer
+  layer1:
+    in_channels: 64       # Input channels for the first block of layers
+    out_channels: 64      # Output channels for the first block of layers
+    blocks: 2             # Number of layers in the first block
+  layer2:
+    in_channels: 64       # Input channels for the second block of layers
+    out_channels: 128     # Output channels for the second block of layers
+    blocks: 2             # Number of layers in the second block
+    stride: 2             # Stride for the first layer in the second block
+  layer3:
+    in_channels: 128      # Input channels for the third block of layers
+    out_channels: 256     # Output channels for the third block of layers
+    blocks: 2             # Number of layers in the third block
+    stride: 2             # Stride for the first layer in the third block
+  layer4:
+    in_channels: 256      # Input channels for the fourth block of layers
+    out_channels: 512     # Output channels for the fourth block of layers
+    blocks: 2             # Number of layers in the fourth block
+    stride: 2             # Stride for the first layer in the fourth block
+
+fpn:
+  lateral:
+    out_channels: 256     # Number of output channels for the lateral layers
+  smooth:
+    out_channels: 256     # Number of output channels for the smooth layers
+    kernel_size: 3        # Kernel size for the smooth layers
+    padding: 1            # Padding for the smooth layers
+
+roi_align:
+  output_size: 14         # Output size for the RoI Align layer
+  spatial_scale: 1.0      # Spatial scale for the RoI Align layer
+  sampling_ratio: 2       # Sampling ratio for the RoI Align layer
+
+
+semantic_lane_head:
+  in_channels: 256        # Input channels for the semantic lane head
+  conv:
+    out_channels: 256     # Output channels for the convolutional layers
+    kernel_size: 3        # Kernel size for the convolutional layers
+    padding: 1            # Padding for the convolutional layers
+  deconv:
+    out_channels: 256     # Output channels for the deconvolutional layer
+    kernel_size: 2        # Kernel size for the deconvolutional layer
+    stride: 2             # Stride for the deconvolutional layer
+  mask_fcn_logits:
+    kernel_size: 1        # Kernel size for the final mask prediction layer
+
+dataloader:
+  batch_size: 4
+  images_path: "data\\images"
+  mask_path: "data\\mask"
+  log_filename: 'app.log'
+
+dataset:
+  bdd100k:
+    train:
+      images_path: "data/bdd100k/images/100k/train"
+      labels_path: "data/bdd100k/labels/lane/masks/train"
+    val:
+      images_path: "data/bdd100k/images/100k/val"
+      labels_path: "data/bdd100k/labels/lane/masks/val"
+  tusimple:
+    train:
+      dir: "data/TuSimpleDataset/training"
+    test:
+      dir: "data/TuSimpleDataset/testing"
+      images_path: "data/TuSimpleDataset/testing/gt_image"
+
+
+main:
+  log_filename: "main.log"
+  logs_dir: "logs/"
+  resize_height: "720"
+  resize_width: "1280"
+
+
+resolution:
+  720p: [720,1280]
+  480p: [480, 854]
+  360p: [360,640]
+  240p: [240,426]
