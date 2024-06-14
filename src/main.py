@@ -118,9 +118,9 @@ def main_mask_R_CNN():
     # Define hyperparameters
     hparams = {
         "batch_size": 32,
-        "lr": 0.01,
+        "lr": 0.0001,
         # "weight_decay": 0.1,
-        "num_epochs": 30,
+        "num_epochs": 15,
         "target_size": (180, 320)
     }
 
@@ -170,7 +170,7 @@ def main_mask_R_CNN():
     # Eval Model
     eval_loss, eval_acc = eval_mask_rCNN(model, hparams, eval_loader, rois, DEVICE)
     logger.log_info("Eval Loss: " + str(eval_loss) + " / Eval Acc:" + str(eval_acc))
-
+    
     # Plot loast & Accuracy
     plt.figure(figsize=(10, 8))
     plt.subplot(2, 1, 1)
@@ -184,7 +184,7 @@ def main_mask_R_CNN():
     plt.plot(tr_acc, label="acc train")
     plt.legend()
     plt.show()
-
+    
     image_path = "data\\bdd100k\\images\\100k\\val\\fdc07c32-1af45031.jpg"
     mask_path = "data\\bdd100k\\labels\\lane\\masks\\val\\fdc07c32-1af45031.png"
     show_sample(model,image_path,mask_path,generate_full_image_rois(1, hparams["target_size"]),DEVICE)

@@ -321,7 +321,7 @@ def train_mask_rCNN(model, hparams, train_loader, rois, device):
         tr_mean_loss = np.mean(tr_loss_temp)
         tr_mean_acc = np.mean(tr_acc_temp)
         logger.log_info(
-            f"Train Epoch {epoch+1} loss={tr_mean_loss:.2f} acc={tr_mean_acc:.2f}"
+            f"Train Epoch {epoch+1} loss={tr_mean_loss:.6f} acc={tr_mean_acc:.6f}"
         )
         tr_loss.append(tr_mean_loss)
         tr_acc.append(tr_mean_acc)
