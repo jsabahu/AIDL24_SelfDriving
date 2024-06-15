@@ -1,18 +1,19 @@
 import torch
 from torch.utils import data
 from torchvision import transforms
-from dataloader import MaskDataset, Dataset_Mask_R_CNN
+from dataloader import MaskDataset, TusimpleSet, Dataset_Mask_R_CNN
 from utils import read_yaml
 from logger import Logger
 from train import train_model, train_mask_rCNN
-from utils import save_model
-from pathlib import Path
 from hyperparameters import hparams
 from torch.utils.data import DataLoader
 from models.model_ENet import ENet
 from models.model_mask_R_CNN import LaneDetectionModel
 import pandas as pd
 import os
+from utils import Rescale
+from models.LaneNet.LaneNet import LaneNet
+import time
 from utils import generate_full_image_rois, show_sample
 import yaml
 import matplotlib.pyplot as plt
@@ -42,35 +43,63 @@ def main_jordi():
         "num_epochs": 5,
     }
 
+    train_dataset_file = os.path.join(
+        config["dataset"]["tusimple"]["train"]["dir"], "train.txt"
+    )
+    val_dataset_path = os.path.join(
+        config["dataset"]["tusimple"]["train"]["dir"], "val.txt"
+    )
+
+    resize_height = int(config["main"]["resize_height"])
+    resize_width = int(config["main"]["resize_width"])
+
     # Define transformation
-    transform = transforms.Compose(
+    data_transforms = {
+        "train": transforms.Compose(
+            [
+                transforms.Resize((resize_height, resize_width)),
+                transforms.ColorJitter(
+                    brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1
+                ),
+                transforms.ToTensor(),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+            ]
+        ),
+        "val": transforms.Compose(
+            [
+                transforms.Resize((resize_height, resize_width)),
+                transforms.ToTensor(),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+            ]
+        ),
+    }
+
+    target_transforms = transforms.Compose(
         [
-            transforms.Resize((360, 640), antialias=True),
-            transforms.ToTensor(),
-            # transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+            Rescale((resize_width, resize_height)),
         ]
     )
 
     # Create training dataset and DataLoader
-    train_dataset = MaskDataset(
-        images_path=config["train"]["images_path"],
-        mask_path=config["train"]["labels_path"],
-        transform=transform,
+    train_dataset = TusimpleSet(
+        train_dataset_file,
+        transform=data_transforms["train"],
+        target_transform=target_transforms,
     )
     train_loader = DataLoader(
         train_dataset, batch_size=hparams["batch_size"], shuffle=True
     )
 
     # Create validation dataset and DataLoader
-    val_dataset = MaskDataset(
-        images_path=config["val"]["images_path"],
-        mask_path=config["val"]["labels_path"],
-        transform=transform,
+    val_dataset = TusimpleSet(
+        val_dataset_path,
+        transform=data_transforms["val"],
+        target_transform=target_transforms,
     )
     val_loader = DataLoader(val_dataset, batch_size=hparams["batch_size"], shuffle=True)
 
-    model = ENet(num_classes=1)
-    model.to(device=DEVICE)
+    model = LaneNet()
+    model.to(DEVICE)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=hparams["lr"])
     logger.log_debug(
@@ -78,8 +107,13 @@ def main_jordi():
     )
 
     model, log = train_model(
-        model, hparams, train_loader, val_loader, optimizer, DEVICE
-    )  # add loss types, or mor arguments
+        model,
+        hparams=hparams,
+        train_loader=train_loader,
+        val_loader=val_loader,
+        optimizer=optimizer,
+        device=DEVICE,
+    )
 
     df = pd.DataFrame({"epoch": [], "training_loss": [], "val_loss": []})
     df["epoch"] = log["epoch"]
@@ -98,7 +132,7 @@ def main_jordi():
     )
     logger.log_debug("training log is saved: {}".format(train_log_save_filename))
 
-    model_save_filename = config["main"]["save_model_path"]
+    model_save_filename = f"models/Lane_Model_ENet_{time.time()}.pth"
     torch.save(model.state_dict(), model_save_filename)
     logger.log_debug("model is saved: {}".format(model_save_filename))
 
@@ -118,9 +152,9 @@ def main_mask_R_CNN():
     # Define hyperparameters
     hparams = {
         "batch_size": 32,
-        "lr": 0.01,
+        "lr": 0.0001,
         # "weight_decay": 0.1,
-        "num_epochs": 30,
+        "num_epochs": 15,
         "target_size": (180, 320),
     }
 
@@ -138,24 +172,6 @@ def main_mask_R_CNN():
     train_dataset = Dataset_Mask_R_CNN(
         images_path=CONFIG["train"]["images_path"],
         mask_path=CONFIG["train"]["labels_path"],
-        batch_size=hparams["batch_size"],
-        transform=transform,
-        transform_mask=transform,
-    )
-
-    # Create training dataset and DataLoader
-    eval_dataset = Dataset_Mask_R_CNN(
-        images_path=CONFIG["val"]["images_path"],
-        mask_path=CONFIG["val"]["labels_path"],
-        batch_size=hparams["batch_size"],
-        transform=transform,
-        transform_mask=transform,
-    )
-
-    # Create training dataset and DataLoader
-    eval_dataset = Dataset_Mask_R_CNN(
-        images_path=CONFIG["val"]["images_path"],
-        mask_path=CONFIG["val"]["labels_path"],
         batch_size=hparams["batch_size"],
         transform=transform,
         transform_mask=transform,

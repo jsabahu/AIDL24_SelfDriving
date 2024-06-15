@@ -5,18 +5,14 @@ import torch.optim as optim
 import numpy as np
 from torcheval.metrics.functional import binary_accuracy
 from utils import read_yaml
-from hyperparameters import hparams
 from utils import binary_accuracy_with_logits, save_model
-from models.model_ENet import ENet
 from models.modelDebug import SimpleSegmentationModel  # Debug Model
-from torchvision import transforms
 from logger import Logger
 from torch.utils.tensorboard import SummaryWriter
 import matplotlib.pyplot as plt
 from time import time
 import copy
-from loss import FocalLoss, DiscriminativeLoss
-import torch.nn as nn
+from models.LaneNet.train_lanenet import compute_loss
 
 # Initialize tensorboard writer and logger
 writer = SummaryWriter()
@@ -65,7 +61,9 @@ def train_single_epoch(model, train_loader, optimizer, device):
     return np.mean(losses), np.mean(accs)
 
 
-def single_epoch_lane_model(model, dataloader, optimizer, device, phase):
+def single_epoch_lane_model(
+    model, dataloader, optimizer, device, phase, loss_type="FocalLoss"
+):
     """
     Train or val the lane detection model for a single epoch.
     """
@@ -76,11 +74,17 @@ def single_epoch_lane_model(model, dataloader, optimizer, device, phase):
     elif phase == "val":
         model.eval()
 
-    accs, losses = [], []  # Initialize accuracies and losses
+    accs, losses, losses_b, losses_i = (
+        [],
+        [],
+        [],
+        [],
+    )  # Initialize accuracies and losses
 
-    for step, (images, masks) in enumerate(dataloader):
+    for step, (images, masks, instances) in enumerate(dataloader):
         images = images.type(torch.FloatTensor).to(device)
         masks = masks.type(torch.LongTensor).to(device)
+        instances = instances.type(torch.FloatTensor).to(device)
 
         optimizer.zero_grad()  # Zero the gradients
 
@@ -89,33 +93,42 @@ def single_epoch_lane_model(model, dataloader, optimizer, device, phase):
         with torch.set_grad_enabled(phase == "train"):
             outputs = model(images)
             # loss = F.binary_cross_entropy_with_logits(outputs, masks)
-            loss = compute_loss(outputs, binary_label=masks)
+            loss = compute_loss(outputs, masks, instances, loss_type)
 
             # backward + optimize only if in training phase
             if phase == "train":
-                loss.backward()
+                loss[0].backward()
                 optimizer.step()
 
-        # Flatten the output and target tensors
-        outputs_flat = outputs.view(-1)
-        masks_flat = masks.view(-1)
+        # statistics
+        running_loss = loss[0].item() * images.size(0)
+        running_loss_b = loss[1].item() * images.size(0)
+        running_loss_i = loss[2].item() * images.size(0)
 
-        acc = binary_accuracy(outputs_flat, masks_flat, threshold=0.5)
+        # Flatten the output and target tensors
+        # outputs_flat = outputs.view(-1)
+        # masks_flat = masks.view(-1)
+
+        # acc = binary_accuracy(outputs_flat, masks_flat, threshold=0.5)
 
         logger.log_debug(
-            f"{phase} phase: Step {step}/{len(dataloader)}: loss={loss.item()}, acc={acc.item()}"
+            f"{phase} phase: Step {step}/{len(dataloader)}: loss={running_loss}, loss_b={running_loss_b}, loss_i={running_loss_i}, acc=Nocomputed"
         )
 
-        losses.append(loss.item())
-        accs.append(acc.item())
+        losses.append(running_loss)
+        losses_b.append(running_loss_b)
+        losses_i.append(running_loss_i)
+        # accs.append(acc.item())
 
     mean_loss = np.mean(losses)
-    mean_acc = np.mean(accs)
+    mean_loss_b = np.mean(losses_b)
+    mean_loss_i = np.mean(losses_i)
+    mean_acc = 0  # np.mean(accs)
     logger.log_debug(
-        f"{phase} phase --> Epoch completed with mean loss: {mean_loss}, mean accuracy: {mean_acc}"
+        f"{phase} phase --> Epoch completed with mean loss: {mean_loss}, loss_b: {mean_loss_b}, loss_i: {mean_loss_i}, mean accuracy: {mean_acc}"
     )
 
-    return mean_loss, mean_acc
+    return mean_loss, mean_loss_b, mean_loss_i, mean_acc
 
 
 def train_model(
@@ -141,7 +154,7 @@ def train_model(
         for phase in ["train", "val"]:
 
             if phase == "train":
-                loss, acc = single_epoch_lane_model(
+                loss, loss_b, loss_i, acc = single_epoch_lane_model(
                     model=model,
                     dataloader=train_loader,
                     optimizer=optimizer,
@@ -149,7 +162,7 @@ def train_model(
                     phase=phase,
                 )
             elif phase == "val":
-                loss, acc = single_epoch_lane_model(
+                loss, loss_b, loss_i, acc = single_epoch_lane_model(
                     model=model,
                     dataloader=val_loader,
                     optimizer=optimizer,
@@ -157,9 +170,13 @@ def train_model(
                     phase=phase,
                 )
 
-            logger.log_debug(f"{phase} Epoch {epoch} loss={loss:.2f} acc={acc:.2f}")
+            logger.log_debug(
+                f"{phase} Epoch {epoch} loss={loss:.2f} loss_b={loss_b:.2f} loss_i={loss_i:.2f} acc={acc:.2f}"
+            )
 
             writer.add_scalar(f"Loss/{phase}", loss, epoch)
+            writer.add_scalar(f"Loss_b/{phase}", loss_b, epoch)
+            writer.add_scalar(f"Loss_i/{phase}", loss_i, epoch)
             writer.add_scalar(f"Acc/{phase}", acc, epoch)
 
             # deep copy the model
@@ -235,26 +252,6 @@ def train_model2(hparams, train_loader, device):
     return model
 
 
-def compute_loss(output, binary_label, loss_type="FocalLoss"):
-    k_binary = 10  # 1.7
-
-    print(binary_label.shape)
-
-    if loss_type == "FocalLoss":
-        loss_fn = FocalLoss(gamma=2, alpha=0.25)
-    elif loss_type == "CrossEntropyLoss":
-        loss_fn = nn.CrossEntropyLoss()
-    else:
-        logger.log_warning("Wrong loss type, will use the default CrossEntropyLoss")
-        loss_fn = nn.CrossEntropyLoss()
-
-    binary_loss = loss_fn(output, binary_label)
-
-    binary_loss = binary_loss * k_binary
-
-    return binary_loss
-
-
 def binary_accuracy(output, masks, threshold=0.5):
     preds = (output >= threshold).float()
     correct = (preds == masks).float()
@@ -324,7 +321,7 @@ def train_mask_rCNN(model, hparams, train_loader, rois, device):
         tr_mean_loss = np.mean(tr_loss_temp)
         tr_mean_acc = np.mean(tr_acc_temp)
         logger.log_info(
-            f"Train Epoch {epoch+1} loss={tr_mean_loss:.2f} acc={tr_mean_acc:.2f}"
+            f"Train Epoch {epoch+1} loss={tr_mean_loss:.6f} acc={tr_mean_acc:.6f}"
         )
         tr_loss.append(tr_mean_loss)
         tr_acc.append(tr_mean_acc)

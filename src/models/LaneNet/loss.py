@@ -1,3 +1,9 @@
+# coding: utf-8
+"""
+This is the implementation of following paper:
+https://arxiv.org/pdf/1802.05591.pdf
+"""
+
 from torch.nn.modules.loss import _Loss
 from torch.autograd import Variable
 import torch
@@ -5,26 +11,6 @@ import torch.nn as nn
 from torch.functional import F
 
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-
-class diceloss(torch.nn.Module):
-    def init(self):
-        super(diceLoss, self).init()
-
-    def forward(self, pred, target):
-        smooth = 1.0
-        iflat = pred.contiguous().view(-1)
-        tflat = target.contiguous().view(-1)
-        intersection = (iflat * tflat).sum()
-        A_sum = torch.sum(iflat * iflat)
-        B_sum = torch.sum(tflat * tflat)
-        return 1 - ((2.0 * intersection + smooth) / (A_sum + B_sum + smooth))
-
-
-"""
-This is the implementation of following paper:
-https://arxiv.org/pdf/1802.05591.pdf
-"""
 
 
 class FocalLoss(nn.Module):
