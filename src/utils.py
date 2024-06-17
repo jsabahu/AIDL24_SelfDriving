@@ -213,10 +213,7 @@ def show_sample(model,image_path,mask_path,target_size,device):
     images = transform(image)
     images = images.unsqueeze(0)
     output = model(images, generate_full_image_rois(1,target_size))
-    # Define the weights for the RGB to grayscale conversion
-    weights = torch.tensor([0.2989, 0.5870, 0.1140], device=device).view(1, 3, 1, 1)
-    # Apply the weights and sum across the channel dimension
-    output = (output * weights).sum(dim=1, keepdim=True)
+
     # Reshape output & masks
     predicted_mask = F.interpolate(output, size=target_size, mode="bilinear", align_corners=False)
     
