@@ -152,9 +152,9 @@ def main_mask_R_CNN():
     # Define hyperparameters
     hparams = {
         "batch_size": 32,
-        "lr": 0.001,
+        "lr": 0.0001,
         # "weight_decay": 0.1,
-        "num_epochs": 1,
+        "num_epochs": 100,
         "target_size": (180, 320),
     }
 
