@@ -300,10 +300,7 @@ def train_mask_rCNN(model, hparams, train_loader, rois, device):
             output = (output * weights).sum(dim=1, keepdim=True)
             # Reshape output & masks
             output = F.interpolate(
-                output,
-                size=hparams["target_size"],
-                mode="bilinear",
-                align_corners=False,
+                output, size=hparams["target_size"], mode="bilinear", align_corners=False
             )
             output = output.reshape(-1).type(torch.float)
             masks = masks.reshape(-1).type(torch.float)  # Convert masks to float
