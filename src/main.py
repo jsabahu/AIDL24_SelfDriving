@@ -2,7 +2,7 @@ import torch
 from torch.utils import data
 from torchvision import transforms
 from dataloader import MaskDataset, TusimpleSet, Dataset_Mask_R_CNN
-from utils import read_yaml
+from utils import read_yaml,save_model
 from logger import Logger
 from train import train_model, train_mask_rCNN
 from hyperparameters import hparams
@@ -152,9 +152,9 @@ def main_mask_R_CNN():
     # Define hyperparameters
     hparams = {
         "batch_size": 32,
-        "lr": 0.0001,
+        "lr": 0.001,
         # "weight_decay": 0.1,
-        "num_epochs": 15,
+        "num_epochs": 1,
         "target_size": (180, 320),
     }
 
@@ -170,8 +170,8 @@ def main_mask_R_CNN():
 
     # Create training dataset and DataLoader
     train_dataset = Dataset_Mask_R_CNN(
-        images_path=CONFIG["train"]["images_path"],
-        mask_path=CONFIG["train"]["labels_path"],
+        images_path=CONFIG["dataset"]["bdd100k"]["train"]["images_path"],
+        mask_path=CONFIG["dataset"]["bdd100k"]["train"]["labels_path"],
         batch_size=hparams["batch_size"],
         transform=transform,
         transform_mask=transform,
@@ -179,8 +179,8 @@ def main_mask_R_CNN():
 
     # Create training dataset and DataLoader
     eval_dataset = Dataset_Mask_R_CNN(
-        images_path=CONFIG["val"]["images_path"],
-        mask_path=CONFIG["val"]["labels_path"],
+        images_path=CONFIG["dataset"]["bdd100k"]["val"]["images_path"],
+        mask_path=CONFIG["dataset"]["bdd100k"]["val"]["labels_path"],
         batch_size=hparams["batch_size"],
         transform=transform,
         transform_mask=transform,
@@ -205,6 +205,7 @@ def main_mask_R_CNN():
 
     # Train Model
     tr_loss, tr_acc = train_mask_rCNN(model, hparams, train_loader, rois, DEVICE)
+    save_model(model,"train_mask_rCNN.pth")
     # Eval Model
     eval_loss, eval_acc = eval_mask_rCNN(model, hparams, eval_loader, rois, DEVICE)
     logger.log_info("Eval Loss: " + str(eval_loss) + " / Eval Acc:" + str(eval_acc))
@@ -223,13 +224,13 @@ def main_mask_R_CNN():
     plt.legend()
     plt.show()
 
-    image_path = "data\\bdd100k\\images\\100k\\val\\fdc07c32-1af45031.jpg"
-    mask_path = "data\\bdd100k\\labels\\lane\\masks\\val\\fdc07c32-1af45031.png"
+    image_path = "data\\bdd100k\\images\\100k\\test\\6558820b-6e0594fa.jpg"
+    mask_path = "data\\bdd100k\\labels\\lane\\masks\\test\\6558820b-6e0594fa.png"
     show_sample(
         model,
         image_path,
         mask_path,
-        generate_full_image_rois(1, hparams["target_size"]),
+        hparams["target_size"],
         DEVICE,
     )
 
