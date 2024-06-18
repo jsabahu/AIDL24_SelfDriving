@@ -198,7 +198,7 @@ def main_mask_R_CNN():
     logger.log_info("Found eval " + str(len(eval_dataset)) + " samples")
 
     # Create Model
-    rois = generate_full_image_rois((hparams["batch_size"]), hparams["target_size"]).to(
+    rois = generate_full_image_rois((hparams["batch_size"]), hparams["target_size"],0).to(
         device=DEVICE
     )
     model = LaneDetectionModel()
