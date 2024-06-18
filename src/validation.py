@@ -1,5 +1,5 @@
 import torch
-from utils import show_sample, generate_full_image_rois
+from utils import show_sample
 from models.model_mask_R_CNN import LaneDetectionModel
 
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -8,7 +8,7 @@ DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 hparams = {"target_size": (180, 320)}
 
 # Choose a image & mask
-image_path = "data\\bdd100k\\images\\100k\\test\\6558820b-6e0594fa.jpg"
+image_path = "data\\imagen.png"
 mask_path = "data\\bdd100k\\labels\\lane\\masks\\test\\6558820b-6e0594fa.png"
 
 # Load the model
