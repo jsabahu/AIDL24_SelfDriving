@@ -84,7 +84,15 @@ dataset:
     test:
       dir: "data/TuSimpleDataset/testing"
       images_path: "data/TuSimpleDataset/testing/gt_image"
+  dataset_Faster_R_CNN:
+      root: "/home/marc/Escritorio/AIDL24_SelfDriving/data/bdd_100k_F_R_CNN/100k_images_train/bdd100k/images/100k/train"
+      annotation_file: "/home/marc/Escritorio/AIDL24_SelfDriving/data/bdd_100k_F_R_CNN/bdd100k_det_20_labels_trainval/bdd100k/labels/det_20/det_train.json"
 
+
+transforms:
+  resize_height: 400
+  resize_width: 400
+  antialias: True
 
 main:
   log_filename: "main.log"
@@ -98,3 +106,16 @@ resolution:
   480p: [480, 854]
   360p: [360,640]
   240p: [240,426]
+
+hyperparameters:
+  batch_size: 1
+  shuffle: True
+  num_workers: 4
+  num_classes: 2  # 1 class (car) + background
+  learning_rate: 0.005
+  momentum: 0.9
+  weight_decay: 0.0005
+  step_size: 3
+  gamma: 0.1
+  num_epochs: 10
+  accumulation_steps: 4
