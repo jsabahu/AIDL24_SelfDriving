@@ -33,7 +33,7 @@ def eval_single_epoch(model, val_loader):
 def eval_mask_rCNN(model, hparams, eval_loader, rois, device):
 
     model.to(device)  # Move model to device
-    # Model in train mode
+    # Model in eval mode
     model.eval()
 
     # Initialize loss function

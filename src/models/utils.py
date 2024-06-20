@@ -195,60 +195,65 @@ def save_model(model: torch.nn.Module, model_name: str):
     logger.log_debug(f"Model saved at {filepath}")
 
 
-def generate_full_image_rois(batch_size, target_size, mode):
+def generate_full_image_rois(batch_size, target_size):
     rois = []
-    # Mode 0, full image
-    # Mode 1, 2/3 of image
-    # Mode 2, 3/4 of image
-    # Mode 3, 1/2 of image
     for i in range(batch_size):
         # RoI format: [batch_index, x1, y1, x2, y2]
-        if (mode == 0) or (mode > 3):
-            rois.append([i, 0, 0, target_size[0], target_size[1]])
-        if mode == 1:
-            rois.append([i, 0, 0, target_size[0], target_size[1]*0.66])
-        if mode == 2:
-            rois.append([i, 0, 0, target_size[0], target_size[1]*0.75])
-        if mode == 3:
-            rois.append([i, 0, 0, target_size[0], target_size[1]*0.5])
+        rois.append([i, 0, 0, target_size[0], target_size[1]])
     return torch.tensor(rois, dtype=torch.float32)
 
-def show_sample(model,image_path,mask_path,target_size,device):
-    import numpy as np
 
+def show_sample(model, image_path, mask_path, rois, device):
     # Read Image & Mask Example
     image = Image.open(image_path).convert("RGB")  # Ensure image is in RGB mode
     mask = Image.open(mask_path).convert("L")  # Convert mask to grayscale
 
     # Prepare image
-    transform = transforms.Compose([transforms.ToTensor(), transforms.Resize(target_size, antialias=True)])
+    target_size = (180, 320)
+    transform = transforms.Compose(
+        [transforms.ToTensor(), transforms.Resize(target_size, antialias=True)]
+    )
     images = transform(image)
     images = images.unsqueeze(0)
-    output = model(images, generate_full_image_rois(1,target_size,0))
-
-    # Reshape output & masks
-    predicted_mask = F.interpolate(output, size=target_size, mode="bilinear", align_corners=False)
+    output = model(images, rois)
+    predicted_mask = F.interpolate(
+        output, size=(720, 1280), mode="bilinear", align_corners=False
+    )
+    logger.log_debug("predicted_mask: %s," + str(predicted_mask.shape))
 
     # Prepare mask
-    transform_mask = transforms.Compose([transforms.ToTensor(), transforms.Resize(target_size, antialias=True)])
+    transform_mask = transforms.Compose(
+        [transforms.ToTensor(), transforms.Resize(target_size, antialias=True)]
+    )
     masks = transform_mask(mask)
     masks = (masks == 1).type(torch.int)
     masks = masks.unsqueeze(0)
 
     # Convert the tensors to numpy arrays for plotting
-    image_np = (images[0].numpy().transpose(1, 2, 0))  # Convert to HWC format for plotting
+    image_np = (
+        images[0].numpy().transpose(1, 2, 0)
+    )  # Convert to HWC format for plotting
     mask_np = masks[0].numpy().transpose(1, 2, 0)  # Convert to HWC format for plotting
-    predicted_mask_np = predicted_mask.detach().cpu().numpy()[0].transpose(1, 2, 0)
+
+    # Define the weights for the RGB to grayscale conversion
+    weights = torch.tensor([0.2989, 0.5870, 0.1140], device=device).view(1, 3, 1, 1)
+    # Apply the weights and sum across the channel dimension
+    output = (output * weights).sum(dim=1, keepdim=True)
+    # Reshape output & masks
+    output = F.interpolate(
+        output, size=target_size, mode="bilinear", align_corners=False
+    )
+    predicted_mask_np = output.detach().cpu().numpy()[0].transpose(1, 2, 0)
 
     # Plot the image and mask
     fig, axes = plt.subplots(1, 3, figsize=(10, 5))
     axes[0].imshow(image_np)
     axes[0].set_title("Image")
     axes[0].axis("off")
-    axes[1].imshow(mask_np, cmap='gray')  # Display mask in grayscale
+    axes[1].imshow(mask_np)
     axes[1].set_title("Mask")
     axes[1].axis("off")
-    axes[2].imshow(predicted_mask_np, cmap='gray')  # Display predicted mask in grayscale
+    axes[2].imshow(predicted_mask_np)
     axes[2].set_title("Predicted Mask")
     axes[2].axis("off")
     plt.show()
