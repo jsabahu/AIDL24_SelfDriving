@@ -1,42 +1,51 @@
-#################### Load & Data Preprocess #####################################
 import os
 import torch
 import torchvision
 import json
 import yaml
-from logger import Logger
+
+# from logger import Logger
 from PIL import Image
 from torch.utils.data import Dataset, DataLoader
 import torchvision.transforms as transforms
+from torchvision.models.detection.faster_rcnn import (
+    FastRCNNPredictor,
+    FasterRCNN_ResNet50_FPN_Weights,
+)
+import torch.optim as optim
+
+
+class Logger:
+    def log_info(self, message):
+        print(f"[INFO]: {message}")
+
+    def log_debug(self, message):
+        print(f"[DEBUG]: {message}")
+
 
 # Create logger
 logger = Logger()
 
-# Load hyperparameters from config file
-with open("configs/config.yaml", "r") as file:
-    CONFIG = yaml.safe_load(file)
 
-# Paths from config
-root = CONFIG["dataset"]["dataset_Faster_R_CNN"]["root"]
-annotation_file = CONFIG["dataset"]["dataset_Faster_R_CNN"]["annotation_file"]
+def load_config(config_path="configs/config.yaml"):
+    with open(config_path, "r") as file:
+        config = yaml.safe_load(file)
+    return config
 
-# Hyperparameters from config
-batch_size = CONFIG["hyperparameters"]["batch_size"]
-shuffle = CONFIG["hyperparameters"]["shuffle"]
-num_workers = CONFIG["hyperparameters"]["num_workers"]
-num_classes = CONFIG["hyperparameters"]["num_classes"]
-learning_rate = CONFIG["hyperparameters"]["learning_rate"]
-momentum = CONFIG["hyperparameters"]["momentum"]
-weight_decay = CONFIG["hyperparameters"]["weight_decay"]
-step_size = CONFIG["hyperparameters"]["step_size"]
-gamma = CONFIG["hyperparameters"]["gamma"]
-num_epochs = CONFIG["hyperparameters"]["num_epochs"]
-accumulation_steps = CONFIG["hyperparameters"]["accumulation_steps"]
 
-# Transformations from config
-resize_height = CONFIG["transforms"]["resize_height"]
-resize_width = CONFIG["transforms"]["resize_width"]
-antialias = CONFIG["transforms"]["antialias"]
+def create_transforms(config):
+    resize_height = config["transforms"]["resize_height"]
+    resize_width = config["transforms"]["resize_width"]
+    antialias = config["transforms"]["antialias"]
+    transform = transforms.Compose(
+        [
+            transforms.ToTensor(),
+            transforms.Resize(
+                (resize_height, resize_width), antialias=antialias
+            ),  # Explicitly set antialias from config
+        ]
+    )
+    return transform
 
 
 class BDDDataset(Dataset):
@@ -85,18 +94,6 @@ class BDDDataset(Dataset):
         return img, target
 
 
-transform = transforms.Compose(
-    [
-        transforms.ToTensor(),
-        transforms.Resize(
-            (resize_height, resize_width), antialias=antialias
-        ),  # Explicitly set antialias from config
-    ]
-)
-
-dataset = BDDDataset(root, annotation_file, transforms=transform)
-
-
 def collate_fn(batch):
     batch = list(filter(lambda x: x is not None, batch))
     if len(batch) == 0:
@@ -104,87 +101,129 @@ def collate_fn(batch):
     return tuple(zip(*batch))
 
 
-data_loader = DataLoader(
-    dataset,
-    batch_size=batch_size,
-    shuffle=shuffle,
-    num_workers=num_workers,
-    collate_fn=collate_fn,
-)
+def create_data_loader(config, dataset):
+    batch_size = config["hyperparameters"]["batch_size"]
+    shuffle = config["hyperparameters"]["shuffle"]
+    num_workers = config["hyperparameters"]["num_workers"]
 
-from torchvision.models.detection.faster_rcnn import (
-    FastRCNNPredictor,
-    FasterRCNN_ResNet50_FPN_Weights,
-)
+    data_loader = DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=shuffle,
+        num_workers=num_workers,
+        collate_fn=collate_fn,
+    )
+    return data_loader
 
-# Load a pre-trained model for classification and return only the features
-model = torchvision.models.detection.fasterrcnn_resnet50_fpn(
-    weights=FasterRCNN_ResNet50_FPN_Weights.COCO_V1
-)
 
-# Get the number of input features for the classifier
-in_features = model.roi_heads.box_predictor.cls_score.in_features
+def create_model(num_classes):
+    # Load a pre-trained model for classification and return only the features
+    model = torchvision.models.detection.fasterrcnn_resnet50_fpn(
+        weights=FasterRCNN_ResNet50_FPN_Weights.COCO_V1
+    )
 
-# Replace the pre-trained head with a new one
-model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
+    # Get the number of input features for the classifier
+    in_features = model.roi_heads.box_predictor.cls_score.in_features
 
-import torch.optim as optim
+    # Replace the pre-trained head with a new one
+    model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
+    return model
 
-# Move model to the right device
-device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-model.to(device)
 
-# Construct an optimizer
-params = [p for p in model.parameters() if p.requires_grad]
-optimizer = optim.SGD(
-    params, lr=learning_rate, momentum=momentum, weight_decay=weight_decay
-)
+def train_model(config, model, data_loader, device):
+    learning_rate = config["hyperparameters"]["learning_rate"]
+    momentum = config["hyperparameters"]["momentum"]
+    weight_decay = config["hyperparameters"]["weight_decay"]
+    step_size = config["hyperparameters"]["step_size"]
+    gamma = config["hyperparameters"]["gamma"]
+    num_epochs = config["hyperparameters"]["num_epochs"]
+    accumulation_steps = config["hyperparameters"]["accumulation_steps"]
 
-# Learning rate scheduler
-lr_scheduler = torch.optim.lr_scheduler.StepLR(
-    optimizer, step_size=step_size, gamma=gamma
-)
+    # Construct an optimizer
+    params = [p for p in model.parameters() if p.requires_grad]
+    optimizer = optim.SGD(
+        params, lr=learning_rate, momentum=momentum, weight_decay=weight_decay
+    )
 
-# Training loop with gradient accumulation
-for epoch in range(num_epochs):
-    model.train()
-    optimizer.zero_grad()
-    for i, (images, targets) in enumerate(data_loader):
-        if len(images) == 0:
-            continue
+    # Learning rate scheduler
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(
+        optimizer, step_size=step_size, gamma=gamma
+    )
 
-        images = list(image.to(device) for image in images)
-        targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
+    # Training loop with gradient accumulation
+    for epoch in range(num_epochs):
+        model.train()
+        optimizer.zero_grad()
+        for i, (images, targets) in enumerate(data_loader):
+            if len(images) == 0:
+                continue
 
-        if any(len(t["boxes"]) == 0 for t in targets):
-            continue
+            images = list(image.to(device) for image in images)
+            targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
-        loss_dict = model(images, targets)
-        losses = sum(loss for loss in loss_dict.values())
+            if any(len(t["boxes"]) == 0 for t in targets):
+                continue
 
-        # Normalize the loss by the accumulation steps
-        losses = losses / accumulation_steps
-        losses.backward()
+            loss_dict = model(images, targets)
+            losses = sum(loss for loss in loss_dict.values())
 
-        if (i + 1) % accumulation_steps == 0:
-            optimizer.step()
-            optimizer.zero_grad()
+            # Normalize the loss by the accumulation steps
+            losses = losses / accumulation_steps
+            losses.backward()
 
-    lr_scheduler.step()
+            if (i + 1) % accumulation_steps == 0:
+                optimizer.step()
+                optimizer.zero_grad()
 
-    logger.log_info(f"Epoch {epoch+1}/{num_epochs}, Loss: {losses.item()}")
+        lr_scheduler.step()
 
-torch.cuda.empty_cache()
+        logger.log_info(f"Epoch {epoch+1}/{num_epochs}, Loss: {losses.item()}")
 
-model.eval()
-with torch.no_grad():
-    for images, targets in data_loader:
-        images = list(image.to(device) for image in images)
-        targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
-        # Perform the prediction
-        predictions = model(images)
+def evaluate_model(model, data_loader, device):
+    model.eval()
+    with torch.no_grad():
+        for images, targets in data_loader:
+            images = list(image.to(device) for image in images)
+            targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
-        # Here you can add code to calculate the evaluation metrics like mAP
+            # Perform the prediction
+            predictions = model(images)
 
-torch.cuda.empty_cache()
+            # Here you can add code to calculate the evaluation metrics like mAP
+
+    torch.cuda.empty_cache()
+
+
+def main():
+    # Load configuration
+    config = load_config()
+
+    # Paths from config
+    root = config["dataset"]["dataset_Faster_R_CNN"]["root"]
+    annotation_file = config["dataset"]["dataset_Faster_R_CNN"]["annotation_file"]
+
+    # Transformations
+    transform = create_transforms(config)
+
+    # Dataset and DataLoader
+    dataset = BDDDataset(root, annotation_file, transforms=transform)
+    data_loader = create_data_loader(config, dataset)
+
+    # Model
+    num_classes = config["hyperparameters"]["num_classes"]
+    model = create_model(num_classes)
+
+    # Device
+    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    model.to(device)
+
+    # Train
+    train_model(config, model, data_loader, device)
+
+    # Evaluate
+    evaluate_model(model, data_loader, device)
+
+
+if __name__ == "__main__":
+    main()
