@@ -155,7 +155,7 @@ def main_mask_R_CNN():
         "lr": 0.0001,
         # "weight_decay": 0.1,
         "num_epochs": 100,
-        "target_size": (180, 320),
+        "target_size": (480, 854),
     }
 
     # Define Transform
@@ -205,7 +205,8 @@ def main_mask_R_CNN():
 
     # Train Model
     tr_loss, tr_acc = train_mask_rCNN(model, hparams, train_loader, rois, DEVICE)
-    save_model(model,"train_mask_rCNN.pth")
+    save_model(model, "train_mask_rCNN_100k.pth")
+    
     # Eval Model
     eval_loss, eval_acc = eval_mask_rCNN(model, hparams, eval_loader, rois, DEVICE)
     logger.log_info("Eval Loss: " + str(eval_loss) + " / Eval Acc:" + str(eval_acc))
