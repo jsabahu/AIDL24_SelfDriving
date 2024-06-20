@@ -284,8 +284,10 @@ def train_mask_rCNN(model, hparams, train_loader, rois, device):
         # Train model for 1 epoch
         logger.log_info(f"Train Epoch {epoch+1}/{num_epoch}")
         tr_loss_temp, tr_acc_temp = [], []
-        for Image_cnt, (images, masks) in enumerate(train_loader):
-            logger.log_info(f"Processing image {Image_cnt+1}/{len(train_loader)}")
+        for step, (images, masks) in enumerate(train_loader):
+            logger.log_info(
+                f"Processing step {step+1}/{len(train_loader)} in epoch: {epoch}/{num_epoch}"
+            )
             # Set network gradients to 0.
             optimizer.zero_grad()  # Restart gradients
             # Move data to device
