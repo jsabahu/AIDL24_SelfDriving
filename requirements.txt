@@ -32,3 +32,4 @@ urllib3==1.26.13
 virtualenv==20.26.2
 torcheval
 opencv-python==4.10.0.82
+torchviz==0.0.2
