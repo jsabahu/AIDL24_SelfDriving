@@ -136,7 +136,7 @@ def train_model(config, model, data_loader, device):
     weight_decay = config["hyperparameters"]["weight_decay"]
     step_size = config["hyperparameters"]["step_size"]
     gamma = config["hyperparameters"]["gamma"]
-    num_epochs = config["hyperparameters"]["num_epochs"]
+    num_epochs = config["hyperparameters"]["num_epoch"]
     accumulation_steps = config["hyperparameters"]["accumulation_steps"]
 
     # Construct an optimizer
