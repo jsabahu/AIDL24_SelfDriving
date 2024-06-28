@@ -10,7 +10,8 @@ hparams = {"target_size": (180, 320)}
 
 # Choose a image & mask
 #image_path = "data\\bdd100k\\images\\100k\\test\\6558820b-6e0594fa.jpg"
-image_path = "data\\imagen.png"
+#image_path = "data\\imagen.png"
+image_path = "data\preview.png"
 mask_path = "data\\bdd100k\\labels\\lane\\masks\\test\\6558820b-6e0594fa.png"
 
 # Load the model

@@ -326,4 +326,9 @@ def train_mask_rCNN(model, hparams, train_loader, rois, device):
         tr_loss.append(tr_mean_loss)
         tr_acc.append(tr_mean_acc)
 
+        writer.add_scalar(f"Loss train", loss, epoch)
+        writer.add_scalar(f"Acc train", acc, epoch)
+
+    writer.flush()
+    logger.log_info("Training complete")
     return tr_loss, tr_acc

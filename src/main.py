@@ -18,6 +18,7 @@ from utils import generate_full_image_rois, show_sample
 import yaml
 import matplotlib.pyplot as plt
 from eval import eval_mask_rCNN
+import models.model_Faster_R_CNN as FCnn  
 
 logger = Logger()
 
@@ -34,7 +35,7 @@ except Exception as e:
     raise
 
 
-def main_jordi():
+def main_LaneNet():
     # Define hyperparameters
     hparams = {
         "batch_size": 16,
@@ -236,9 +237,50 @@ def main_mask_R_CNN():
     )
 
 
+def main_Faster_R_CNN():
+    # Load configuration
+    config = FCnn.load_config()
+
+    # Transformations
+    transform = FCnn.create_transforms(config)
+
+    # Train Dataset and DataLoader
+    train_dataset = FCnn.BDDDataset(
+        config["dataset"]["dataset_Faster_R_CNN"]["train"]["root"],
+        config["dataset"]["dataset_Faster_R_CNN"]["train"]["annotation_file"],
+        transforms=transform
+        )
+    train_data_loader = FCnn.create_data_loader(config, train_dataset)
+
+    # Eval Dataset and DataLoader
+    eval_dataset = FCnn.BDDDataset(
+        config["dataset"]["dataset_Faster_R_CNN"]["val"]["root"],
+        config["dataset"]["dataset_Faster_R_CNN"]["val"]["annotation_file"],
+        transforms=transform
+        )
+    eval_data_loader = FCnn.create_data_loader(config, eval_dataset)
+
+    # Model
+    num_classes = config["hyperparameters"]["num_classes"]
+    model = FCnn.create_model(num_classes)
+
+    # Device
+    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    model.to(device)
+
+    # Train
+    FCnn.train_model(config, model, train_data_loader, device)
+
+    save_model(model, "Faster_R_CNN.pth")
+
+    # Evaluate
+    FCnn.evaluate_model(model, eval_data_loader, device)
+
 if __name__ == "__main__":
-    check = False
-    if check:
-        main_jordi()
-    else:
+    select = "FasterRCNN"
+    if select=="LaneNet":
+        main_LaneNet()
+    if select=="maskRCNN":
         main_mask_R_CNN()
+    if select=="FasterRCNN":
+        main_Faster_R_CNN()

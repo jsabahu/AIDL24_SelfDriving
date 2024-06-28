@@ -3,8 +3,8 @@ import torch
 import torchvision
 import json
 import yaml
-
-# from logger import Logger
+from utils import save_model
+from logger import Logger
 from PIL import Image
 from torch.utils.data import Dataset, DataLoader
 import torchvision.transforms as transforms
@@ -13,17 +13,11 @@ from torchvision.models.detection.faster_rcnn import (
     FasterRCNN_ResNet50_FPN_Weights,
 )
 import torch.optim as optim
+from torch.utils.tensorboard import SummaryWriter
+import numpy as np
 
-
-class Logger:
-    def log_info(self, message):
-        print(f"[INFO]: {message}")
-
-    def log_debug(self, message):
-        print(f"[DEBUG]: {message}")
-
-
-# Create logger
+# Initialize tensorboard writer and logger
+writer = SummaryWriter()
 logger = Logger()
 
 
@@ -175,23 +169,36 @@ def train_model(config, model, data_loader, device):
                 optimizer.step()
                 optimizer.zero_grad()
 
+            writer.add_scalar(f"Loss train", losses.item(), epoch)
+
         lr_scheduler.step()
 
         logger.log_info(f"Epoch {epoch+1}/{num_epochs}, Loss: {losses.item()}")
+    
+    writer.flush()
 
 
 def evaluate_model(model, data_loader, device):
     model.eval()
+
     with torch.no_grad():
         for images, targets in data_loader:
             images = list(image.to(device) for image in images)
             targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
             # Perform the prediction
-            predictions = model(images)
+            loss_dict = model(images, targets)
+            losses = sum(loss for loss in loss_dict.values())
+
+            writer.add_scalar(f"Loss eval", losses.item())
 
             # Here you can add code to calculate the evaluation metrics like mAP
 
+    torch.cuda.empty_cache()
+
+    logger.log_info(f"Eval Loss: {np.mean(losses)}")   
+
+    writer.flush()
     torch.cuda.empty_cache()
 
 
@@ -221,9 +228,10 @@ def main():
     # Train
     train_model(config, model, data_loader, device)
 
+    save_model(model, "Faster_R_CNN.pth")
+
     # Evaluate
     evaluate_model(model, data_loader, device)
-
 
 if __name__ == "__main__":
     main()
