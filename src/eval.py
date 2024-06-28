@@ -7,10 +7,12 @@ import numpy as np
 from torcheval.metrics.functional import binary_accuracy
 import matplotlib.pyplot as plt
 from logger import Logger
+from torch.utils.tensorboard import SummaryWriter
 
-# Set up logging
+# Initialize tensorboard writer and logger
 logger = Logger()
 logging.basicConfig(level=logging.INFO)
+writer = SummaryWriter()
 
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 # Parameters to use
@@ -62,7 +64,11 @@ def eval_mask_rCNN(model, hparams, eval_loader, rois, device):
         # Add loss & acc to list
         ev_loss.append(loss.item())
         ev_acc.append(acc.item())
-    
+        
+        writer.add_scalar(f"Loss eval", loss.item())
+        writer.add_scalar(f"Acc eval", acc.item())
+
+    writer.flush()
     # Plot loast & Accuracy
     plt.figure(figsize=(10, 8))
     plt.subplot(2, 1, 1)

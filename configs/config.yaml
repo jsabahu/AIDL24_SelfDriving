@@ -85,8 +85,12 @@ dataset:
       dir: "data/TuSimpleDataset/testing"
       images_path: "data/TuSimpleDataset/testing/gt_image"
   dataset_Faster_R_CNN:
-      root: "/home/marc/Escritorio/AIDL24_SelfDriving/data/bdd_100k_F_R_CNN/100k_images_train/bdd100k/images/100k/train"
-      annotation_file: "/home/marc/Escritorio/AIDL24_SelfDriving/data/bdd_100k_F_R_CNN/bdd100k_det_20_labels_trainval/bdd100k/labels/det_20/det_train.json"
+    train:
+      root: "data/bdd100k/images/100k/train"
+      annotation_file: "data/bdd100k/labels/det_20/det_train.json"
+    val:
+      root: "data/bdd100k/images/100k/val"
+      annotation_file: "data/bdd100k/labels/det_20/det_train.json"
 
 
 transforms:

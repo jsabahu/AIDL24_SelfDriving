@@ -9,6 +9,10 @@ from PIL import Image
 import matplotlib.pyplot as plt
 import numpy as np
 
+GraphMode = 0 #Just Video with WheelDrive
+#GraphMode = 1 #Compare models
+#GraphMode = 2 #All
+
 # Device configuration
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -41,7 +45,10 @@ transform2 = transforms.Compose([
 ])
 
 # Open the video file
-video_file = 'data/Example1.mp4'
+#video_file = 'data/Example1.mp4'
+#video_file = 'data/video1.hevc'
+video_file = 'data/sample2.mp4'
+wheel_file = 'data/drivewheel.png'
 cap = cv2.VideoCapture(video_file)
 if not cap.isOpened():
     print("Error: Could not open video.")
@@ -57,23 +64,50 @@ interval = int(fps)
 print(f"The video will be processed every {interval} frames to have a 1-second refresh.")
 
 # Initialize video writer
-output_video_file = 'data/Example1_output.mp4'
-output_video = cv2.VideoWriter(output_video_file, cv2.VideoWriter_fourcc(*'mp4v'), 1.0, (2*target_size[1]*3, 2*target_size[0]))
+output_video_file = 'data/Sample_output.mp4'
+if GraphMode == 0:
+    output_video = cv2.VideoWriter(output_video_file, cv2.VideoWriter_fourcc(*'mp4v'), 1.0, (2*target_size[1], 2*target_size[0]))
+else:
+    output_video = cv2.VideoWriter(output_video_file, cv2.VideoWriter_fourcc(*'mp4v'), 1.0, (2*target_size[1]*3, 2*target_size[0]))
+# Initialize angle
+angle = 0
 
 # Create the plot window
-fig, axes = plt.subplots(1, 3, figsize=(2*target_size[1]*0.03, 2*target_size[0]*0.01))
-#fig.subplots_adjust(left=0.05, right=0.95, top=0.9, bottom=0.1)
-im_original = axes[0].imshow(np.zeros((target_size[0], target_size[1], 3), dtype=np.uint8))
-axes[0].set_title("Original Frame")
-axes[0].axis('off')
-im_predicted_mask_rCNN = axes[1].imshow(np.ones((target_size[0], target_size[1]), dtype=np.uint8), cmap='gray', vmin=0, vmax=1)
-axes[1].set_title("Predicted Mask rCNN")
-axes[1].axis('off')
-im_predicted_LaneNet = axes[2].imshow(np.ones((target_size[0], target_size[1]), dtype=np.uint8), cmap='gray', vmin=0, vmax=1)
-axes[2].set_title("Predicted Mask LaneNet")
-axes[2].axis('off')
-annotation1 = axes[1].text(160, 20, "0", ha='center', va='center', fontsize=12, color='black', bbox=dict(facecolor='white', edgecolor='black', boxstyle='round,pad=0.5'))
-annotation2 = axes[2].text(160, 20, "0", ha='center', va='center', fontsize=12, color='black', bbox=dict(facecolor='white', edgecolor='black', boxstyle='round,pad=0.5'))
+if GraphMode == 0:
+    fig, axes = plt.subplots(1, 1, figsize=(2*target_size[1]*0.01, 2*target_size[0]*0.01))
+    #fig.subplots_adjust(left=0.05, right=0.95, top=0.9, bottom=0.1)
+    im_original = axes.imshow(np.zeros((target_size[0], target_size[1], 3), dtype=np.uint8))
+    axes.set_title("Original Frame")
+    axes.axis('off')
+
+if GraphMode == 1:
+    fig, axes = plt.subplots(1, 3, figsize=(2*target_size[1]*0.03, 2*target_size[0]*0.01))
+    #fig.subplots_adjust(left=0.05, right=0.95, top=0.9, bottom=0.1)
+    im_original = axes[0].imshow(np.zeros((target_size[0], target_size[1], 3), dtype=np.uint8))
+    axes[0].set_title("Original Frame")
+    axes[0].axis('off')
+    im_predicted_mask_rCNN = axes[1].imshow(np.ones((target_size[0], target_size[1]), dtype=np.uint8), cmap='gray', vmin=0, vmax=1)
+    axes[1].set_title("Predicted Mask rCNN")
+    axes[1].axis('off')
+    im_predicted_LaneNet = axes[2].imshow(np.ones((target_size[0], target_size[1]), dtype=np.uint8), cmap='gray', vmin=0, vmax=1)
+    axes[2].set_title("Predicted Mask LaneNet")
+    axes[2].axis('off')
+
+if GraphMode == 2:
+    fig, axes = plt.subplots(1, 3, figsize=(2*target_size[1]*0.03, 2*target_size[0]*0.01))
+    #fig.subplots_adjust(left=0.05, right=0.95, top=0.9, bottom=0.1)
+    im_original = axes[0].imshow(np.zeros((target_size[0], target_size[1], 3), dtype=np.uint8))
+    axes[0].set_title("Original Frame")
+    axes[0].axis('off')
+    im_predicted_mask_rCNN = axes[1].imshow(np.ones((target_size[0], target_size[1]), dtype=np.uint8), cmap='gray', vmin=0, vmax=1)
+    axes[1].set_title("Predicted Mask rCNN")
+    axes[1].axis('off')
+    im_predicted_LaneNet = axes[2].imshow(np.ones((target_size[0], target_size[1]), dtype=np.uint8), cmap='gray', vmin=0, vmax=1)
+    axes[2].set_title("Predicted Mask LaneNet")
+    axes[2].axis('off')
+    annotation1 = axes[1].text(160, 20, "0", ha='center', va='center', fontsize=12, color='black', bbox=dict(facecolor='white', edgecolor='black', boxstyle='round,pad=0.5'))
+    annotation2 = axes[2].text(160, 20, "0", ha='center', va='center', fontsize=12, color='black', bbox=dict(facecolor='white', edgecolor='black', boxstyle='round,pad=0.5'))
+
 plt.tight_layout()
 plt.show(block=False)  # Show the plot window without blocking
 
@@ -88,6 +122,11 @@ while cap.isOpened():
     if frame_count % interval == 0:
         frame_resized = cv2.resize(frame, target_size)
         image = Image.fromarray(cv2.cvtColor(frame_resized, cv2.COLOR_BGR2RGB))
+        # Prepare Wheel Image
+        wheel_image = Image.open(wheel_file).convert("RGBA")
+        transform = transforms.ToTensor()
+        wheel_image = transform(wheel_image)
+        wheel_image_resized = transforms.Resize((100, 100))(wheel_image)
         #image = Image.open("data\\imagen.png").convert("RGB")   # Image for validation using plot blocked
 
         # Mask R-CNN processing
@@ -127,20 +166,42 @@ while cap.isOpened():
         else:
             angle1 = 0
             angle2 = 0
+        
+        if GraphMode == 2:
+            annotation1.set_text(f"Rotation: {angle1:.2f} deg")
+            annotation2.set_text(f"Rotation: {angle2:.2f} deg")
 
-        annotation1.set_text(f"Rotation: {angle1:.2f} deg")
-        annotation2.set_text(f"Rotation: {angle2:.2f} deg")
+        # Show Wheel
+        x_offset = 40
+        y_offset = 220
 
-        #print(f"Estimated rotation difference: {angle:.2f} degrees")
+        angle = angle + angle1*2
+        rotate_transform = transforms.functional.rotate
+        wheel_image_rotated = rotate_transform(wheel_image_resized, angle=angle)
+
+        wheel_image_rgb = wheel_image_rotated[:3]
+        wheel_image_alpha = wheel_image_rotated[3:]
+        alpha_complement = 1 - wheel_image_alpha
+
+        image = transform(image)
+       
+        for c in range(3):
+            image[c, y_offset:y_offset+wheel_image_rotated.size(1), x_offset:x_offset+wheel_image_rotated.size(2)] = (
+            image[c, y_offset:y_offset+wheel_image_rotated.size(1), x_offset:x_offset+wheel_image_rotated.size(2)] * alpha_complement
+            + wheel_image_rgb[c] * wheel_image_alpha)
+        
+        image = transforms.ToPILImage()(image)
+        
         # Update the Matplotlib plot
         #im_original.set_data(cv2.cvtColor(frame_resized, cv2.COLOR_BGR2RGB))
         im_original.set_data(image)
-        im_predicted_mask_rCNN.set_data(output1_np)
-        im_predicted_LaneNet.set_data(output2)
+        if GraphMode >= 1:
+            im_predicted_mask_rCNN.set_data(output1_np)
+            im_predicted_LaneNet.set_data(output2)
 
         # Refresh the plot
         plt.pause(0.01)  # Pause for a short interval to update plot
-
+        
         # Save plot as frame
         fig.canvas.draw()
         plot_frame = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
@@ -149,6 +210,11 @@ while cap.isOpened():
 
         # Write the frame to the video
         output_video.write(plot_frame)
+        
+        # Save the fig.canvas as a .jpg image
+        #if frame_count != 0:  # Save the first frame as an example
+        #    image_pil = Image.fromarray(cv2.cvtColor(plot_frame, cv2.COLOR_BGR2RGB))
+        #    image_pil.save(str(frame_count)+"output_image.jpg")
 
         # Debug prints
         #print(output2["instance_seg_logits"].shape)
