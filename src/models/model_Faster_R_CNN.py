@@ -68,12 +68,14 @@ def create_transforms(config):
 
 
 class BDDDataset(Dataset):
-    def __init__(self, root, annotation_file, transforms=None):
+    def __init__(self, root, annotation_file, transforms=None, filter_annotations=True):
         self.root = root
         self.transforms = transforms
+        self.filter_annotations = filter_annotations
         with open(annotation_file) as f:
             self.annotations = json.load(f)
-        self.annotations = self._filter_annotations(self.annotations)
+        if self.filter_annotations:
+            self.annotations = self._filter_annotations(self.annotations)
         logger.log_info(
             f"Filtered dataset to {len(self.annotations)} valid annotations."
         )
@@ -85,10 +87,10 @@ class BDDDataset(Dataset):
                 obj["category"] == "car" for obj in ann["labels"]
             ):
                 valid_annotations.append(ann)
-            else:
-                logger.log_debug(
-                    f"Skipping invalid annotation: {ann['name'] if 'name' in ann else 'unknown'}"
-                )
+            # else:
+            # logger.log_debug(
+            #    f"Skipping invalid annotation: {ann['name'] if 'name' in ann else 'unknown'}"
+            # )
         return valid_annotations
 
     def __len__(self):
@@ -111,7 +113,7 @@ class BDDDataset(Dataset):
         labels = []
         if "labels" in ann:
             for obj in ann["labels"]:
-                if obj["category"] == "car":
+                if not self.filter_annotations or obj["category"] == "car":
                     x_min, y_min, x_max, y_max = (
                         obj["box2d"]["x1"],
                         obj["box2d"]["y1"],
@@ -359,7 +361,9 @@ def main():
     train_loader = create_data_loader(config, train_dataset)
 
     # Dataset and DataLoader for validation
-    val_dataset = BDDDataset(val_root, val_annotation_file, transforms=transform)
+    val_dataset = BDDDataset(
+        val_root, val_annotation_file, transforms=transform, filter_annotations=False
+    )
     val_valid_indices = range(
         min(500, len(val_dataset))
     )  # Limit validation set to 500 images
