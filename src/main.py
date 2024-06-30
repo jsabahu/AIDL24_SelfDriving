@@ -241,24 +241,27 @@ def main_Faster_R_CNN():
     # Load configuration
     config = FCnn.load_config()
 
+    # Paths from config
+    root = config["dataset"]["dataset_Faster_R_CNN"]["root"]
+    annotation_file = config["dataset"]["dataset_Faster_R_CNN"]["annotation_file"]
+    val_root = config["dataset"]["dataset_Faster_R_CNN"]["val_root"]
+    val_annotation_file = config["dataset"]["dataset_Faster_R_CNN"][
+        "val_annotation_file"
+    ]
+
     # Transformations
     transform = FCnn.create_transforms(config)
 
-    # Train Dataset and DataLoader
-    train_dataset = FCnn.BDDDataset(
-        config["dataset"]["dataset_Faster_R_CNN"]["train"]["root"],
-        config["dataset"]["dataset_Faster_R_CNN"]["train"]["annotation_file"],
-        transforms=transform
-        )
-    train_data_loader = FCnn.create_data_loader(config, train_dataset)
+    # Dataset and DataLoader for training
+    train_dataset = FCnn.BDDDataset(root, annotation_file, transforms=transform)
+    train_dataset = FCnn.Subset(train_dataset, range(500))  # Limit training set to 500 images
+    train_loader = FCnn.create_data_loader(config, train_dataset)
 
-    # Eval Dataset and DataLoader
-    eval_dataset = FCnn.BDDDataset(
-        config["dataset"]["dataset_Faster_R_CNN"]["val"]["root"],
-        config["dataset"]["dataset_Faster_R_CNN"]["val"]["annotation_file"],
-        transforms=transform
-        )
-    eval_data_loader = FCnn.create_data_loader(config, eval_dataset)
+    # Dataset and DataLoader for validation
+    val_dataset = FCnn.BDDDataset(val_root, val_annotation_file, transforms=transform)
+    val_valid_indices = range(min(500, len(val_dataset)))  # Limit validation set to 500 images
+    val_dataset = FCnn.Subset(val_dataset, val_valid_indices)
+    val_loader = FCnn.create_data_loader(config, val_dataset)
 
     # Model
     num_classes = config["hyperparameters"]["num_classes"]
@@ -269,12 +272,8 @@ def main_Faster_R_CNN():
     model.to(device)
 
     # Train
-    FCnn.train_model(config, model, train_data_loader, device)
-
+    FCnn.train_model(config, model, train_loader, val_loader, device)
     save_model(model, "Faster_R_CNN.pth")
-
-    # Evaluate
-    FCnn.evaluate_model(model, eval_data_loader, device)
 
 if __name__ == "__main__":
     select = "FasterRCNN"
