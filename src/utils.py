@@ -265,27 +265,9 @@ def show_sample(model,image_path,mask_path,target_size,device):
     plt.show()
     return
 
-def calculate_rotation_difference(img1, img2):
-    """
-    Calculate the rotation angle difference between two binary masks.
-    
-    Args:
-        img1 (np.ndarray): First binary mask (previous frame).
-        img2 (np.ndarray): Second binary mask (current frame).
-    
-    Returns:
-        float: Estimated rotation difference in degrees.
-    """
+def calculate_rotation_difference(img1, img2, type=0):
+ 
     def find_centroid(img):
-        """
-        Find the centroid of the binary image.
-        
-        Args:
-            mask (np.ndarray): Binary image.
-        
-        Returns:
-            tuple: (cx, cy) Centroid coordinates.
-        """
         M = cv2.moments(img)
         if M["m00"] != 0:
             cx = int(M["m10"] / M["m00"])
@@ -294,18 +276,64 @@ def calculate_rotation_difference(img1, img2):
             cx, cy = 0, 0
         return cx, cy
     
-    # Find centroids of the binary image
-    cx1, cy1 = find_centroid(img1.astype(np.uint8))
-    cx2, cy2 = find_centroid(img2.astype(np.uint8))
+    # Applied on mask
+    if type == 0:
+        # Find centroids of the binary image
+        cx1, cy1 = find_centroid(img1.astype(np.uint8))
+        cx2, cy2 = find_centroid(img2.astype(np.uint8))
 
-    # Calculate the angle between the centroids
-    angle1 = np.arctan2(cy1, cx1)
-    angle2 = np.arctan2(cy2, cx2)
+        # Calculate the angle between the centroids
+        angle1 = np.arctan2(cy1, cx1)
+        angle2 = np.arctan2(cy2, cx2)
     
-    # Calculate the rotation difference
-    rotation_difference = np.degrees(angle2 - angle1)
+        # Calculate the rotation difference
+        rotation_difference = np.degrees(angle2 - angle1)
     
-    # Normalize the angle to the range [-180, 180]
-    rotation_difference = (rotation_difference + 180) % 360 - 180
-    
+        # Normalize the angle to the range [-180, 180]
+        rotation_difference = (rotation_difference + 180) % 360 - 180
+
+    # Applied on image
+    if type == 1:
+
+        # Convert images to numpy array
+        img1 = np.array(img1)
+        img2 = np.array(img2)
+        
+        # Convert images to grayscale
+        gray1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
+        gray2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
+
+        # Initialize ORB detector
+        orb = cv2.ORB_create()
+
+        # Find keypoints and descriptors
+        keypoints1, descriptors1 = orb.detectAndCompute(gray1, None)
+        keypoints2, descriptors2 = orb.detectAndCompute(gray2, None)
+
+        # Initialize matcher
+        bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+
+        # Match descriptors
+        matches = bf.match(descriptors1, descriptors2)
+
+        # Sort matches by distance
+        matches = sorted(matches, key=lambda x: x.distance)
+
+        # Use the best 10 matches to estimate rotation
+        if len(matches) > 10:
+            matches = matches[:10]
+
+        src_pts = np.float32([keypoints1[m.queryIdx].pt for m in matches]).reshape(-1, 1, 2)
+        dst_pts = np.float32([keypoints2[m.trainIdx].pt for m in matches]).reshape(-1, 1, 2)
+
+        # Estimate affine transformation using RANSAC
+        M, _ = cv2.estimateAffinePartial2D(src_pts, dst_pts)
+
+        if M is None:
+            return 0.0  # No transformation estimated
+
+        # Calculate rotation angle
+        rotation_angle_rad = -np.arctan2(M[0, 1], M[0, 0])
+        rotation_difference = np.degrees(rotation_angle_rad)
+
     return rotation_difference
