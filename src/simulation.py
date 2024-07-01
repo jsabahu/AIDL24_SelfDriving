@@ -1,17 +1,23 @@
 import torch
 from models.model_mask_R_CNN import LaneDetectionModel
 from models.LaneNet.LaneNet import LaneNet
+import models.model_Faster_R_CNN as FCnn  
 from torchvision import transforms
+from torchvision.transforms.functional import to_pil_image
 from utils import generate_full_image_rois, calculate_rotation_difference
 import torch.nn.functional as F
 import cv2
-from PIL import Image
+from PIL import Image, ImageDraw
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.colors import LinearSegmentedColormap
 
-GraphMode = 0 #Just Video with WheelDrive
-#GraphMode = 1 #Compare models
-#GraphMode = 2 #All
+#GraphMode = 0 # Just Video with WheelDrive
+#GraphMode = 1 # Compare models
+#GraphMode = 2 # All
+#GraphMode = 3 # Just Video with WheelDrive (Image vs Model) 
+#GraphMode = 4 # Compare models overwriting lines
+GraphMode = 5 # Just Video with WheelDrive and Car Detection
 
 # Device configuration
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -39,15 +45,26 @@ model2.eval()
 # Transform for LaneNet
 transform2 = transforms.Compose([
     #transforms.Resize((target_size[0], target_size[1])),
-    transforms.Resize((360, 640)),
+    #transforms.Resize((360, 640)),
+    transforms.Resize((256, 512)),
     transforms.ToTensor(),
     transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
 ])
 
+# Prepare Faster R-CNN
+config = FCnn.load_config() # Load configuration
+
+model3 = FCnn.create_model(config["hyperparameters"]["num_classes"])
+model3.load_state_dict(torch.load('models/Faster_R_CNN.pth', map_location=DEVICE))
+model3.eval()
+
+# Transform for Faster R-CNN
+transform3 = FCnn.create_transforms(config)
+
 # Open the video file
 #video_file = 'data/Example1.mp4'
-#video_file = 'data/video1.hevc'
-video_file = 'data/sample2.mp4'
+video_file = 'data/video1.hevc'
+#video_file = 'data/sample2.mp4'
 wheel_file = 'data/drivewheel.png'
 cap = cv2.VideoCapture(video_file)
 if not cap.isOpened():
@@ -65,12 +82,17 @@ print(f"The video will be processed every {interval} frames to have a 1-second r
 
 # Initialize video writer
 output_video_file = 'data/Sample_output.mp4'
-if GraphMode == 0:
+if GraphMode == 0 or GraphMode == 3 or GraphMode == 5:
     output_video = cv2.VideoWriter(output_video_file, cv2.VideoWriter_fourcc(*'mp4v'), 1.0, (2*target_size[1], 2*target_size[0]))
-else:
+if GraphMode == 1 or GraphMode == 2:
     output_video = cv2.VideoWriter(output_video_file, cv2.VideoWriter_fourcc(*'mp4v'), 1.0, (2*target_size[1]*3, 2*target_size[0]))
+if GraphMode == 4:
+    output_video = cv2.VideoWriter(output_video_file, cv2.VideoWriter_fourcc(*'mp4v'), 1.0, (2*target_size[1]*2, 2*target_size[0]))
+
+
 # Initialize angle
 angle = 0
+angle_img = 0
 
 # Create the plot window
 if GraphMode == 0:
@@ -107,6 +129,35 @@ if GraphMode == 2:
     axes[2].axis('off')
     annotation1 = axes[1].text(160, 20, "0", ha='center', va='center', fontsize=12, color='black', bbox=dict(facecolor='white', edgecolor='black', boxstyle='round,pad=0.5'))
     annotation2 = axes[2].text(160, 20, "0", ha='center', va='center', fontsize=12, color='black', bbox=dict(facecolor='white', edgecolor='black', boxstyle='round,pad=0.5'))
+
+if GraphMode == 3:
+    fig, axes = plt.subplots(1, 1, figsize=(2*target_size[1]*0.01, 2*target_size[0]*0.01))
+    #fig.subplots_adjust(left=0.05, right=0.95, top=0.9, bottom=0.1)
+    im_original = axes.imshow(np.zeros((target_size[0], target_size[1], 3), dtype=np.uint8))
+    axes.set_title("Original Frame")
+    axes.axis('off')
+    annotation0 = axes.text(160, 20, "0", ha='center', va='center', fontsize=12, color='black', bbox=dict(facecolor='white', edgecolor='black', boxstyle='round,pad=0.5'))
+
+if GraphMode == 4:
+    cmap_colour = LinearSegmentedColormap.from_list('colour', [(0, 'red'), (1, 'white')])
+    fig, axes = plt.subplots(1, 2, figsize=(2*target_size[1]*0.02, 2*target_size[0]*0.01))
+    #fig.subplots_adjust(left=0.05, right=0.95, top=0.9, bottom=0.1)
+    im_original1 = axes[0].imshow(np.zeros((target_size[0], target_size[1], 3), dtype=np.uint8))
+    #im_mask1 = axes[0].imshow(np.zeros((target_size[0], target_size[1]), dtype=np.uint8), cmap='gray', vmin=0, vmax=1, alpha=0.1)
+    im_mask1 = axes[0].imshow(np.zeros((target_size[0], target_size[1]), dtype=np.uint8), cmap=cmap_colour, vmin=0, vmax=1, alpha=0.2)
+    axes[0].set_title("Mask rCNN")
+    axes[0].axis('off')
+    im_original2 = axes[1].imshow(np.zeros((target_size[0], target_size[1], 3), dtype=np.uint8))
+    im_mask2 = axes[1].imshow(np.zeros((target_size[0], target_size[1]), dtype=np.uint8), cmap=cmap_colour, vmin=0, vmax=1, alpha=0.2)
+    axes[1].set_title("LaneNet")
+    axes[1].axis('off')
+
+if GraphMode == 5:
+    fig, axes = plt.subplots(1, 1, figsize=(2*target_size[1]*0.01, 2*target_size[0]*0.01))
+    #fig.subplots_adjust(left=0.05, right=0.95, top=0.9, bottom=0.1)
+    im_original = axes.imshow(np.zeros((target_size[0], target_size[1], 3), dtype=np.uint8))
+    axes.set_title("Original Frame")
+    axes.axis('off')
 
 plt.tight_layout()
 plt.show(block=False)  # Show the plot window without blocking
@@ -156,46 +207,126 @@ while cap.isOpened():
             weights2 = torch.tensor([0.2989, 0.5870, 0.1140], device=DEVICE).view(1, 1, 3)
             output2 = (output2 * weights2).sum(dim=2, keepdim=True)
             output2 = (output2 - output2.min()) / (output2.max() - output2.min())
-            output2 = (output2 > 0.3).type(torch.int)
+            output2 = (output2 > 0.5).type(torch.int)
             output2_np = output2.detach().cpu().numpy()
 
-        # Show angle difference
+        # Show angle difference       
         if frame_count != 0:
+            angle0 = calculate_rotation_difference(image_prev, image, type=1)
             angle1 = calculate_rotation_difference(output1_np_prev, output1_np)
             angle2 = calculate_rotation_difference(output2_np_prev, output2_np)
         else:
+            angle0 = 0
             angle1 = 0
             angle2 = 0
+
+        image_prev = image
         
         if GraphMode == 2:
             annotation1.set_text(f"Rotation: {angle1:.2f} deg")
             annotation2.set_text(f"Rotation: {angle2:.2f} deg")
 
-        # Show Wheel
-        x_offset = 40
-        y_offset = 220
+        if GraphMode == 3:
+            annotation0.set_text(f"Image: {angle0:.2f} deg vs Model: {angle1:.2f}")
+            
+        if GraphMode == 0 or GraphMode == 2 or GraphMode == 5:
+            # Show WheelDrive
+            x_offset = 40
+            y_offset = 220
 
-        angle = angle + angle1*2
-        rotate_transform = transforms.functional.rotate
-        wheel_image_rotated = rotate_transform(wheel_image_resized, angle=angle)
+            angle = angle + angle1*2
+            rotate_transform = transforms.functional.rotate
+            wheel_image_rotated = rotate_transform(wheel_image_resized, angle=angle)
 
-        wheel_image_rgb = wheel_image_rotated[:3]
-        wheel_image_alpha = wheel_image_rotated[3:]
-        alpha_complement = 1 - wheel_image_alpha
+            wheel_image_rgb = wheel_image_rotated[:3]
+            wheel_image_alpha = wheel_image_rotated[3:]
+            alpha_complement = 1 - wheel_image_alpha
 
-        image = transform(image)
+            image = transform(image)
        
-        for c in range(3):
-            image[c, y_offset:y_offset+wheel_image_rotated.size(1), x_offset:x_offset+wheel_image_rotated.size(2)] = (
-            image[c, y_offset:y_offset+wheel_image_rotated.size(1), x_offset:x_offset+wheel_image_rotated.size(2)] * alpha_complement
-            + wheel_image_rgb[c] * wheel_image_alpha)
+            for c in range(3):
+                image[c, y_offset:y_offset+wheel_image_rotated.size(1), x_offset:x_offset+wheel_image_rotated.size(2)] = (
+                image[c, y_offset:y_offset+wheel_image_rotated.size(1), x_offset:x_offset+wheel_image_rotated.size(2)] * alpha_complement
+                + wheel_image_rgb[c] * wheel_image_alpha)
         
-        image = transforms.ToPILImage()(image)
+            image = transforms.ToPILImage()(image)
+
+        if GraphMode == 3:
+            # Show double WheelDrive
+            x_offset_img = 0
+            y_offset_img = 220
+            x_offset = 80
+            y_offset = 220
+
+            angle_img = angle_img + angle0*2
+            angle = angle + angle1*2
+            rotate_transform = transforms.functional.rotate
+            wheel_image_rotated_img = rotate_transform(wheel_image_resized, angle=angle_img)
+            wheel_image_rotated = rotate_transform(wheel_image_resized, angle=angle)
+
+            wheel_image_rgb_img = wheel_image_rotated_img[:3]
+            wheel_image_alpha_img = wheel_image_rotated_img[3:]
+            alpha_complement_img = 1 - wheel_image_alpha_img
+            
+            wheel_image_rgb = wheel_image_rotated[:3]
+            wheel_image_alpha = wheel_image_rotated[3:]
+            alpha_complement = 1 - wheel_image_alpha
+            
+            image = transform(image)
+       
+            for c in range(3):
+                image[c, y_offset_img:y_offset_img+wheel_image_rotated_img.size(1), x_offset_img:x_offset_img+wheel_image_rotated_img.size(2)] = (
+                image[c, y_offset_img:y_offset_img+wheel_image_rotated_img.size(1), x_offset_img:x_offset_img+wheel_image_rotated_img.size(2)] * alpha_complement_img
+                + wheel_image_rgb_img[c] * wheel_image_alpha_img)
+                                
+                image[c, y_offset:y_offset+wheel_image_rotated.size(1), x_offset:x_offset+wheel_image_rotated.size(2)] = (
+                image[c, y_offset:y_offset+wheel_image_rotated.size(1), x_offset:x_offset+wheel_image_rotated.size(2)] * alpha_complement
+                + wheel_image_rgb[c] * wheel_image_alpha)
         
+            image = transforms.ToPILImage()(image)
+        
+        if GraphMode == 5:
+            # Faster R-CNN processing
+            image3 = transform3(image).unsqueeze(0).to(DEVICE)
+            with torch.no_grad():
+                # New image
+                output3 = model3(image3)
+                boxes = output3[0]['boxes'].cpu().detach().numpy()
+                scores = output3[0]['scores'].cpu().detach().numpy()
+                labels = output3[0]['labels'].cpu().detach().numpy()
+                # Filter out low-confidence predictions
+                threshold = 0.5
+                boxes = boxes[scores >= threshold]
+                labels = labels[scores >= threshold]
+                scores = scores[scores >= threshold]
+                # Draw boxes
+                #draw = ImageDraw.Draw(to_pil_image(image3.squeeze().cpu()))
+                draw = ImageDraw.Draw(image)
+                print("Number of boxes:",len(boxes))
+                
+                for box, label, score in zip(boxes, labels, scores):
+                    print(f"Box: {box}, Label: {label}, Score: {score}")
+                    x1, y1, x2, y2 = box
+                    draw.rectangle(((x1, y1), (x2, y2)), outline="red", width=3)
+                    draw.text((x1, y1), f"{label}: {score:.2f}", fill="red")
+                
+                #draw.rectangle(((50, 50), (100, 100)), outline="red", width=3)
+                #draw.text((50, 50), "car", fill="red")
         # Update the Matplotlib plot
         #im_original.set_data(cv2.cvtColor(frame_resized, cv2.COLOR_BGR2RGB))
-        im_original.set_data(image)
-        if GraphMode >= 1:
+        if GraphMode == 0 or GraphMode == 1 or GraphMode == 2 or GraphMode == 3:
+            im_original.set_data(image)
+
+        if GraphMode == 4:
+            im_original1.set_data(image)
+            im_mask1.set_data(output1_np)
+            im_original2.set_data(image)
+            im_mask2.set_data(output2_np)
+
+        if GraphMode == 5:
+            im_original.set_data(image)
+
+        if GraphMode == 1 or GraphMode == 2:
             im_predicted_mask_rCNN.set_data(output1_np)
             im_predicted_LaneNet.set_data(output2)
 
