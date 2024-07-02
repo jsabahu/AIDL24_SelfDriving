@@ -18,6 +18,7 @@ from utils import generate_full_image_rois, show_sample
 import yaml
 import matplotlib.pyplot as plt
 from eval import eval_mask_rCNN
+import models.model_Faster_R_CNN as FCnn  
 
 logger = Logger()
 
@@ -34,7 +35,7 @@ except Exception as e:
     raise
 
 
-def main_jordi():
+def main_LaneNet():
     # Define hyperparameters
     hparams = {
         "batch_size": 16,
@@ -236,9 +237,49 @@ def main_mask_R_CNN():
     )
 
 
+def main_Faster_R_CNN():
+    # Load configuration
+    config = FCnn.load_config()
+
+    # Paths from config
+    root = config["dataset"]["dataset_Faster_R_CNN"]["root"]
+    annotation_file = config["dataset"]["dataset_Faster_R_CNN"]["annotation_file"]
+    val_root = config["dataset"]["dataset_Faster_R_CNN"]["val_root"]
+    val_annotation_file = config["dataset"]["dataset_Faster_R_CNN"][
+        "val_annotation_file"
+    ]
+
+    # Transformations
+    transform = FCnn.create_transforms(config)
+
+    # Dataset and DataLoader for training
+    train_dataset = FCnn.BDDDataset(root, annotation_file, transforms=transform)
+    train_dataset = FCnn.Subset(train_dataset, range(500))  # Limit training set to 500 images
+    train_loader = FCnn.create_data_loader(config, train_dataset)
+
+    # Dataset and DataLoader for validation
+    val_dataset = FCnn.BDDDataset(val_root, val_annotation_file, transforms=transform)
+    val_valid_indices = range(min(500, len(val_dataset)))  # Limit validation set to 500 images
+    val_dataset = FCnn.Subset(val_dataset, val_valid_indices)
+    val_loader = FCnn.create_data_loader(config, val_dataset)
+
+    # Model
+    num_classes = config["hyperparameters"]["num_classes"]
+    model = FCnn.create_model(num_classes)
+
+    # Device
+    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    model.to(device)
+
+    # Train
+    FCnn.train_model(config, model, train_loader, val_loader, device)
+    save_model(model, "Faster_R_CNN.pth")
+
 if __name__ == "__main__":
-    check = False
-    if check:
-        main_jordi()
-    else:
+    select = "FasterRCNN"
+    if select=="LaneNet":
+        main_LaneNet()
+    if select=="maskRCNN":
         main_mask_R_CNN()
+    if select=="FasterRCNN":
+        main_Faster_R_CNN()

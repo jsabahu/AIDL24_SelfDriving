@@ -4,7 +4,7 @@ import torchvision
 import json
 import yaml
 from PIL import Image
-from torch.utils.data import Dataset, DataLoader, Subset
+from torch.utils.data import Dataset, DataLoader
 import torchvision.transforms as transforms
 from torchvision.models.detection.faster_rcnn import (
     FastRCNNPredictor,
@@ -12,7 +12,11 @@ from torchvision.models.detection.faster_rcnn import (
 )
 import torch.optim as optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.utils.tensorboard import SummaryWriter
+from utils import save_model
+from logger import Logger
 
+"""
 # Simple Logger class implementation
 class Logger:
     def __init__(self, log_file="training.log"):
@@ -29,9 +33,10 @@ class Logger:
         print(log_message)  # Print to console
         with open(self.log_file, "a") as file:
             file.write(log_message + "\n")  # Write to file
+"""
 
-
-# Create logger
+# Initialize tensorboard writer and logger
+writer = SummaryWriter()
 logger = Logger()
 
 
@@ -137,6 +142,10 @@ class BDDDataset(Dataset):
             logger.log_debug(f"NaN detected in image: {img_path}. Skipping...")
             return None
 
+        if torch.isnan(img).any():
+            logger.log_debug(f"NaN detected in image: {img_path}. Skipping...")
+            return None
+
         return img, target
 
 
@@ -181,12 +190,21 @@ def train_model(config, model, train_loader, val_loader, device):
     learning_rate = (
         config["hyperparameters"]["learning_rate"] * 0.01
     )  # Lower initial learning rate
+
+
+def train_model(config, model, train_loader, val_loader, device):
+    learning_rate = (
+        config["hyperparameters"]["learning_rate"] * 0.01
+    )  # Lower initial learning rate
     weight_decay = config["hyperparameters"]["weight_decay"]
+    num_epochs = config["hyperparameters"]["num_epoch"]
     num_epochs = config["hyperparameters"]["num_epoch"]
     accumulation_steps = config["hyperparameters"]["accumulation_steps"]
     patience = config["hyperparameters"]["patience"] + 5  # Increased patience
+    patience = config["hyperparameters"]["patience"] + 5  # Increased patience
 
     params = [p for p in model.parameters() if p.requires_grad]
+    optimizer = optim.Adam(params, lr=learning_rate, weight_decay=weight_decay)
     optimizer = optim.Adam(params, lr=learning_rate, weight_decay=weight_decay)
 
     # Learning rate scheduler
@@ -197,8 +215,12 @@ def train_model(config, model, train_loader, val_loader, device):
     best_val_loss = float("inf")
     early_stopping_counter = 0
 
+    best_val_loss = float("inf")
+    early_stopping_counter = 0
+
     for epoch in range(num_epochs):
         model.train()
+        running_loss = 0.0
         running_loss = 0.0
         optimizer.zero_grad()
         for i, (images, targets) in enumerate(train_loader):
@@ -207,7 +229,10 @@ def train_model(config, model, train_loader, val_loader, device):
                     f"No valid images in batch at iteration {i}. Skipping..."
                 )
                 continue
-
+            else:
+                logger.log_debug(
+                    f"{len(images)} valid images in batch at iteration {i}."
+                )
             images = list(image.to(device) for image in images)
             targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
@@ -227,8 +252,21 @@ def train_model(config, model, train_loader, val_loader, device):
                 logger.log_debug(f"Targets: {targets}")
                 continue
 
+            if torch.isnan(losses):
+                logger.log_debug(
+                    f"NaN detected in losses at iteration {i} of epoch {epoch}"
+                )
+                for k, v in loss_dict.items():
+                    logger.log_debug(f"{k} loss: {v}")
+                logger.log_debug(f"Images: {images}")
+                logger.log_debug(f"Targets: {targets}")
+                continue
+
             losses = losses / accumulation_steps
             losses.backward()
+
+            # Gradient clipping
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=2.0)
 
             # Gradient clipping
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=2.0)
@@ -295,8 +333,15 @@ def evaluate_model(model, data_loader, device, iou_threshold=0.5):
     correct = 0
     total = 0
     running_val_loss = 0.0
+    correct = 0
+    total = 0
+    running_val_loss = 0.0
     with torch.no_grad():
         for images, targets in data_loader:
+            if len(images) == 0:  # Check if the list of images is empty
+                logger.log_debug("No valid images in batch. Skipping...")
+                continue
+
             if len(images) == 0:  # Check if the list of images is empty
                 logger.log_debug("No valid images in batch. Skipping...")
                 continue
@@ -349,6 +394,10 @@ def main():
     val_annotation_file = config["dataset"]["dataset_Faster_R_CNN"][
         "val_annotation_file"
     ]
+    val_root = config["dataset"]["dataset_Faster_R_CNN"]["val_root"]
+    val_annotation_file = config["dataset"]["dataset_Faster_R_CNN"][
+        "val_annotation_file"
+    ]
 
     # Transformations
     transform = create_transforms(config)
@@ -380,6 +429,7 @@ def main():
 
     # Train
     train_model(config, model, train_loader, val_loader, device)
+    save_model(model, "Faster_R_CNN.pth")
 
 
 if __name__ == "__main__":

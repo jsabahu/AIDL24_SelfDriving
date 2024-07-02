@@ -85,10 +85,11 @@ dataset:
       dir: "data/TuSimpleDataset/testing"
       images_path: "data/TuSimpleDataset/testing/gt_image"
   dataset_Faster_R_CNN:
-      root: "/home/marc/Escritorio/AIDL24_SelfDriving/data/bdd_100k_F_R_CNN/100k_images_train/bdd100k/images/100k/train"
-      annotation_file: "/home/marc/Escritorio/AIDL24_SelfDriving/data/bdd_100k_F_R_CNN/bdd100k_det_20_labels_trainval/bdd100k/labels/det_20/det_train.json"
-      val_root: "/home/marc/Escritorio/AIDL24_SelfDriving/data/bdd_100k_F_R_CNN/100k_images_val/bdd100k/images/100k/val"
-      val_annotation_file: "/home/marc/Escritorio/AIDL24_SelfDriving/data/bdd_100k_F_R_CNN/bdd100k_det_20_labels_trainval/bdd100k/labels/det_20/det_val.json"
+      root: "data/bdd_100k_F_R_CNN/100k_images_train/bdd100k/images/100k/train"
+      annotation_file: "data/bdd_100k_F_R_CNN/bdd100k_det_20_labels_trainval/bdd100k/labels/det_20/det_train.json"
+      val_root: "data/bdd_100k_F_R_CNN/100k_images_val/bdd100k/images/100k/val"
+      val_annotation_file: "data/bdd_100k_F_R_CNN/bdd100k_det_20_labels_trainval/bdd100k/labels/det_20/det_val.json"
+
 
 transforms:
   resize_height: 400
