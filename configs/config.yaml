@@ -119,6 +119,6 @@ hyperparameters:
   weight_decay: 0.0005
   step_size: 3
   gamma: 0.1
-  num_epoch: 1
+  num_epoch: 15
   accumulation_steps: 4
   patience: 3
