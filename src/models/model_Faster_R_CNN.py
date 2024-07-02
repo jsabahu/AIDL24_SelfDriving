@@ -4,7 +4,7 @@ import torchvision
 import json
 import yaml
 from PIL import Image
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, Subset
 import torchvision.transforms as transforms
 from torchvision.models.detection.faster_rcnn import (
     FastRCNNPredictor,
