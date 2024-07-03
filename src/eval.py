@@ -19,6 +19,7 @@ device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cp
 config_path = "configs/config.yaml"
 config = read_yaml(config_path)
 
+
 def eval_single_epoch(model, val_loader):
     accs, losses = [], []
     with torch.no_grad():
@@ -31,6 +32,7 @@ def eval_single_epoch(model, val_loader):
             losses.append(loss.item())
             accs.append(acc.item())
     return np.mean(losses), np.mean(accs)
+
 
 def eval_mask_rCNN(model, hparams, eval_loader, rois, device):
 
@@ -54,17 +56,19 @@ def eval_mask_rCNN(model, hparams, eval_loader, rois, device):
         # Apply the weights and sum across the channel dimension
         output = (output * weights).sum(dim=1, keepdim=True)
         # Reshape output & masks
-        output = F.interpolate(output, size=hparams["target_size"], mode="bilinear", align_corners=False)
+        output = F.interpolate(
+            output, size=hparams["target_size"], mode="bilinear", align_corners=False
+        )
         output = output.reshape(-1).type(torch.float)
         masks = masks.reshape(-1).type(torch.float)  # Convert masks to float
         # Compute loss
-        loss = criterion(output, masks)
+        loss = criterion(output, massks)
         # Compute metrics
         acc = binary_accuracy(output, masks, threshold=0.5)
         # Add loss & acc to list
         ev_loss.append(loss.item())
         ev_acc.append(acc.item())
-        
+
         writer.add_scalar(f"Loss eval", loss.item())
         writer.add_scalar(f"Acc eval", acc.item())
 

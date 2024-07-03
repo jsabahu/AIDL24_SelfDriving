@@ -248,7 +248,7 @@ def train_model(config, model, train_loader, val_loader, device):
                 optimizer.zero_grad()
 
             running_loss += losses.item()
-            
+
         logger.log_info(
             f"Epoch {epoch+1}/{num_epochs}, Loss: {running_loss / len(train_loader)}"
         )
@@ -265,7 +265,6 @@ def train_model(config, model, train_loader, val_loader, device):
 
         writer.add_scalar(f"Loss eval", val_loss)
 
-
         # Adjust learning rate
         lr_scheduler.step(val_loss)
 
@@ -278,7 +277,7 @@ def train_model(config, model, train_loader, val_loader, device):
             if early_stopping_counter >= patience:
                 logger.log_info(f"Early stopping at epoch {epoch+1}")
                 break
-    
+
     writer.flush()
     torch.cuda.empty_cache()
 

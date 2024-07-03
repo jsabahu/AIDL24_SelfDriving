@@ -208,81 +208,100 @@ def generate_full_image_rois(batch_size, target_size, mode):
         if (mode == 0) or (mode > 4):
             rois.append([i, 0, 0, target_size[0], target_size[1]])
         if mode == 1:
-            rois.append([i, 0, 0, target_size[0]*0.66, target_size[1]])
+            rois.append([i, 0, 0, target_size[0] * 0.66, target_size[1]])
         if mode == 2:
-            rois.append([i, 0, 0, target_size[0]*0.75, target_size[1]])
+            rois.append([i, 0, 0, target_size[0] * 0.75, target_size[1]])
         if mode == 3:
-            rois.append([i, 0, 0, target_size[0]*0.5, target_size[1]])
+            rois.append([i, 0, 0, target_size[0] * 0.5, target_size[1]])
         if mode == 4:
-            rois.append([i, (target_size[0]-180)/2, 0, (target_size[0]-180)/2+180, 320])
+            rois.append(
+                [
+                    i,
+                    (target_size[0] - 180) / 2,
+                    0,
+                    (target_size[0] - 180) / 2 + 180,
+                    320,
+                ]
+            )
     return torch.tensor(rois, dtype=torch.float32)
 
-def show_sample(model,image_path,mask_path,target_size,device):
+
+def show_sample(model, image_path, mask_path, target_size, device):
 
     # Read Image & Mask Example
     image = Image.open(image_path).convert("RGB")  # Ensure image is in RGB mode
     mask = Image.open(mask_path).convert("L")  # Convert mask to grayscale
 
     # Prepare image
-    transform = transforms.Compose([transforms.ToTensor(), transforms.Resize(target_size, antialias=True)])
+    transform = transforms.Compose(
+        [transforms.ToTensor(), transforms.Resize(target_size, antialias=True)]
+    )
     images = transform(image)
     images = images.unsqueeze(0)
 
     # Get output from model
-    output = model(images, generate_full_image_rois(1,target_size,0))
+    output = model(images, generate_full_image_rois(1, target_size, 0))
     # Apply weights
     weights = torch.tensor([0.2989, 0.5870, 0.1140], device=device).view(1, 3, 1, 1)
     output = (output * weights).sum(dim=1, keepdim=True)
     # Scale to target_size
-    output = F.interpolate(output, size=target_size, mode="bilinear", align_corners=False)
+    output = F.interpolate(
+        output, size=target_size, mode="bilinear", align_corners=False
+    )
     # Normalize to 0-1 range
-    output = (output - output.min()) / (output.max() - output.min()) 
+    output = (output - output.min()) / (output.max() - output.min())
     # Apply threshold to eliminate noise
     output = (output > 0.001).type(torch.int)
 
     # Prepare mask
-    transform_mask = transforms.Compose([transforms.ToTensor(), transforms.Resize(target_size, antialias=True)])
+    transform_mask = transforms.Compose(
+        [transforms.ToTensor(), transforms.Resize(target_size, antialias=True)]
+    )
     masks = transform_mask(mask)
     masks = (masks == 1).type(torch.int)
     masks = masks.unsqueeze(0)
 
     # Convert the tensors to numpy arrays for plotting
-    image_np = (images[0].numpy().transpose(1, 2, 0))  # Convert to HWC format for plotting
+    image_np = (
+        images[0].numpy().transpose(1, 2, 0)
+    )  # Convert to HWC format for plotting
     mask_np = masks[0].numpy().transpose(1, 2, 0)  # Convert to HWC format for plotting
-    output_np = output.detach().cpu().numpy()[0].transpose(1, 2, 0) 
+    output_np = output.detach().cpu().numpy()[0].transpose(1, 2, 0)
 
     # Plot the image and mask
     fig, axes = plt.subplots(1, 3, figsize=(10, 5))
     axes[0].imshow(image_np)
     axes[0].set_title("Image")
     axes[0].axis("off")
-    axes[1].imshow(mask_np, cmap='gray')  # Display mask in grayscale
+    axes[1].imshow(mask_np, cmap="gray")  # Display mask in grayscale
     axes[1].set_title("Mask")
     axes[1].axis("off")
-    axes[2].imshow(output_np, cmap='gray')  # Display predicted mask in grayscale
+    axes[2].imshow(output_np, cmap="gray")  # Display predicted mask in grayscale
     axes[2].set_title("Predicted Mask")
     axes[2].axis("off")
     plt.show()
     return
 
+
 def calculate_rotation_difference(img1, img2):
     """
     Calculate the rotation angle difference between two binary masks.
-    
+
     Args:
         img1 (np.ndarray): First binary mask (previous frame).
         img2 (np.ndarray): Second binary mask (current frame).
-    
+
     Returns:
         float: Estimated rotation difference in degrees.
     """
+
     def find_centroid(img):
         """
         Find the centroid of the binary image.
-        
+
         Args:
             mask (np.ndarray): Binary image.
-        
+
         Returns:
             tuple: (cx, cy) Centroid coordinates.
         """
@@ -293,7 +312,7 @@ def calculate_rotation_difference(img1, img2):
         else:
             cx, cy = 0, 0
         return cx, cy
-    
+
     # Find centroids of the binary image
     cx1, cy1 = find_centroid(img1.astype(np.uint8))
     cx2, cy2 = find_centroid(img2.astype(np.uint8))
@@ -301,11 +320,11 @@ def calculate_rotation_difference(img1, img2):
     # Calculate the angle between the centroids
     angle1 = np.arctan2(cy1, cx1)
     angle2 = np.arctan2(cy2, cx2)
-    
+
     # Calculate the rotation difference
     rotation_difference = np.degrees(angle2 - angle1)
-    
+
     # Normalize the angle to the range [-180, 180]
     rotation_difference = (rotation_difference + 180) % 360 - 180
-    
+
     return rotation_difference

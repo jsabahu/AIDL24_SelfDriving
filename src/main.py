@@ -2,7 +2,7 @@ import torch
 from torch.utils import data
 from torchvision import transforms
 from dataloader import MaskDataset, TusimpleSet, Dataset_Mask_R_CNN
-from utils import read_yaml,save_model
+from utils import read_yaml, save_model
 from logger import Logger
 from train import train_model, train_mask_rCNN
 from hyperparameters import hparams
@@ -18,7 +18,7 @@ from utils import generate_full_image_rois, show_sample
 import yaml
 import matplotlib.pyplot as plt
 from eval import eval_mask_rCNN
-import models.model_Faster_R_CNN as FCnn  
+import models.model_Faster_R_CNN as FCnn
 
 logger = Logger()
 
@@ -199,15 +199,15 @@ def main_mask_R_CNN():
     logger.log_info("Found eval " + str(len(eval_dataset)) + " samples")
 
     # Create Model
-    rois = generate_full_image_rois((hparams["batch_size"]), hparams["target_size"],0).to(
-        device=DEVICE
-    )
+    rois = generate_full_image_rois(
+        (hparams["batch_size"]), hparams["target_size"], 0
+    ).to(device=DEVICE)
     model = LaneDetectionModel()
 
     # Train Model
     tr_loss, tr_acc = train_mask_rCNN(model, hparams, train_loader, rois, DEVICE)
     save_model(model, "train_mask_rCNN_100k.pth")
-    
+
     # Eval Model
     eval_loss, eval_acc = eval_mask_rCNN(model, hparams, eval_loader, rois, DEVICE)
     logger.log_info("Eval Loss: " + str(eval_loss) + " / Eval Acc:" + str(eval_acc))
@@ -254,12 +254,16 @@ def main_Faster_R_CNN():
 
     # Dataset and DataLoader for training
     train_dataset = FCnn.BDDDataset(root, annotation_file, transforms=transform)
-    train_dataset = FCnn.Subset(train_dataset, range(500))  # Limit training set to 500 images
+    train_dataset = FCnn.Subset(
+        train_dataset, range(500)
+    )  # Limit training set to 500 images
     train_loader = FCnn.create_data_loader(config, train_dataset)
 
     # Dataset and DataLoader for validation
     val_dataset = FCnn.BDDDataset(val_root, val_annotation_file, transforms=transform)
-    val_valid_indices = range(min(500, len(val_dataset)))  # Limit validation set to 500 images
+    val_valid_indices = range(
+        min(500, len(val_dataset))
+    )  # Limit validation set to 500 images
     val_dataset = FCnn.Subset(val_dataset, val_valid_indices)
     val_loader = FCnn.create_data_loader(config, val_dataset)
 
@@ -275,11 +279,12 @@ def main_Faster_R_CNN():
     FCnn.train_model(config, model, train_loader, val_loader, device)
     save_model(model, "Faster_R_CNN.pth")
 
+
 if __name__ == "__main__":
     select = "FasterRCNN"
-    if select=="LaneNet":
+    if select == "LaneNet":
         main_LaneNet()
-    if select=="maskRCNN":
+    if select == "maskRCNN":
         main_mask_R_CNN()
-    if select=="FasterRCNN":
+    if select == "FasterRCNN":
         main_Faster_R_CNN()

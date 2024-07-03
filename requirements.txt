@@ -12,6 +12,7 @@ mpmath==1.2.1
 networkx==3.0
 nodeenv==1.8.0
 numpy==1.24.2
+opencv-python==4.10.0.82
 pandas==1.5.3
 Pillow==9.3.0
 platformdirs==4.2.2
@@ -26,10 +27,9 @@ sympy==1.11.1
 tensorboard
 torch==2.0.0
 torchaudio==2.0.1
+torcheval
 torchvision==0.15.1
+torchviz==0.0.2
 typing_extensions==4.4.0
 urllib3==1.26.13
 virtualenv==20.26.2
-torcheval
-opencv-python==4.10.0.82
-torchviz==0.0.2
