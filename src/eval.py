@@ -11,7 +11,6 @@ from torch.utils.tensorboard import SummaryWriter
 
 # Initialize tensorboard writer and logger
 logger = Logger()
-logging.basicConfig(level=logging.INFO)
 writer = SummaryWriter()
 
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
