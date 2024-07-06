@@ -198,22 +198,16 @@ def train_model(config, model, train_loader, val_loader, device):
     )  # Lower initial learning rate
     weight_decay = config["hyperparameters"]["weight_decay"]
     num_epochs = config["hyperparameters"]["num_epoch"]
-    num_epochs = config["hyperparameters"]["num_epoch"]
     accumulation_steps = config["hyperparameters"]["accumulation_steps"]
-    patience = config["hyperparameters"]["patience"] + 5  # Increased patience
     patience = config["hyperparameters"]["patience"] + 5  # Increased patience
 
     params = [p for p in model.parameters() if p.requires_grad]
-    optimizer = optim.Adam(params, lr=learning_rate, weight_decay=weight_decay)
     optimizer = optim.Adam(params, lr=learning_rate, weight_decay=weight_decay)
 
     # Learning rate scheduler
     lr_scheduler = ReduceLROnPlateau(
         optimizer, "min", patience=3, factor=0.1, verbose=True
     )
-
-    best_val_loss = float("inf")
-    early_stopping_counter = 0
 
     best_val_loss = float("inf")
     early_stopping_counter = 0
@@ -231,7 +225,6 @@ def train_model(config, model, train_loader, val_loader, device):
         else:
             logger.log_debug("Model train started")
 
-        running_loss = 0.0
         running_loss = 0.0
         optimizer.zero_grad()
         for i, (images, targets) in enumerate(train_loader):
@@ -263,21 +256,8 @@ def train_model(config, model, train_loader, val_loader, device):
                 logger.log_debug(f"Targets: {targets}")
                 continue
 
-            if torch.isnan(losses):
-                logger.log_debug(
-                    f"NaN detected in losses at iteration {i} of epoch {epoch}"
-                )
-                for k, v in loss_dict.items():
-                    logger.log_debug(f"{k} loss: {v}")
-                logger.log_debug(f"Images: {images}")
-                logger.log_debug(f"Targets: {targets}")
-                continue
-
             losses = losses / accumulation_steps
             losses.backward()
-
-            # Gradient clipping
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=2.0)
 
             # Gradient clipping
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=2.0)
@@ -351,10 +331,6 @@ def evaluate_model(model, data_loader, device, iou_threshold=0.5):
     running_val_loss = 0.0
     with torch.no_grad():
         for images, targets in data_loader:
-            if len(images) == 0:  # Check if the list of images is empty
-                logger.log_debug("No valid images in batch. Skipping...")
-                continue
-
             if len(images) == 0:  # Check if the list of images is empty
                 logger.log_debug("No valid images in batch. Skipping...")
                 continue
