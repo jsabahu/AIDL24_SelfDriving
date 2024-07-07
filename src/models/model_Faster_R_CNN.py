@@ -73,30 +73,29 @@ def create_transforms(config):
 
 
 class BDDDataset(Dataset):
-    def __init__(self, root, annotation_file, transforms=None):
+    def __init__(self, root, annotation_file, transforms=None, filter_annotations=True):
         self.root = root
         self.transforms = transforms
+        self.filter_annotations = filter_annotations
         with open(annotation_file) as f:
             self.annotations = json.load(f)
-        self.annotations = self._filter_annotations(self.annotations)
+        if self.filter_annotations:
+            self.annotations = self._filter_annotations(self.annotations)
         logger.log_info(
             f"Filtered dataset to {len(self.annotations)} valid annotations."
         )
 
     def _filter_annotations(self, annotations):
         valid_annotations = []
-        image_files = sorted(
-            [f for f in os.listdir(self.root) if f.lower().endswith(".jpg")]
-        )
         for ann in annotations:
             if "labels" in ann and any(
                 obj["category"] == "car" for obj in ann["labels"]
             ):
                 valid_annotations.append(ann)
-            else:
-                logger.log_debug(
-                    f"Skipping invalid annotation: {ann['name'] if 'name' in ann else 'unknown'}"
-                )
+            # else:
+            # logger.log_debug(
+            #    f"Skipping invalid annotation: {ann['name'] if 'name' in ann else 'unknown'}"
+            # )
         return valid_annotations
 
     def __len__(self):
@@ -119,7 +118,7 @@ class BDDDataset(Dataset):
         labels = []
         if "labels" in ann:
             for obj in ann["labels"]:
-                if obj["category"] == "car":
+                if not self.filter_annotations or obj["category"] == "car":
                     x_min, y_min, x_max, y_max = (
                         obj["box2d"]["x1"],
                         obj["box2d"]["y1"],
@@ -138,6 +137,10 @@ class BDDDataset(Dataset):
 
         if self.transforms:
             img = self.transforms(img)
+
+        if torch.isnan(img).any():
+            logger.log_debug(f"NaN detected in image: {img_path}. Skipping...")
+            return None
 
         if torch.isnan(img).any():
             logger.log_debug(f"NaN detected in image: {img_path}. Skipping...")
@@ -187,12 +190,21 @@ def train_model(config, model, train_loader, val_loader, device):
     learning_rate = (
         config["hyperparameters"]["learning_rate"] * 0.01
     )  # Lower initial learning rate
+
+
+def train_model(config, model, train_loader, val_loader, device):
+    learning_rate = (
+        config["hyperparameters"]["learning_rate"] * 0.01
+    )  # Lower initial learning rate
     weight_decay = config["hyperparameters"]["weight_decay"]
+    num_epochs = config["hyperparameters"]["num_epoch"]
     num_epochs = config["hyperparameters"]["num_epoch"]
     accumulation_steps = config["hyperparameters"]["accumulation_steps"]
     patience = config["hyperparameters"]["patience"] + 5  # Increased patience
+    patience = config["hyperparameters"]["patience"] + 5  # Increased patience
 
     params = [p for p in model.parameters() if p.requires_grad]
+    optimizer = optim.Adam(params, lr=learning_rate, weight_decay=weight_decay)
     optimizer = optim.Adam(params, lr=learning_rate, weight_decay=weight_decay)
 
     # Learning rate scheduler
@@ -203,11 +215,14 @@ def train_model(config, model, train_loader, val_loader, device):
     best_val_loss = float("inf")
     early_stopping_counter = 0
 
+    best_val_loss = float("inf")
+    early_stopping_counter = 0
+
     for epoch in range(num_epochs):
         model.train()
         running_loss = 0.0
+        running_loss = 0.0
         optimizer.zero_grad()
-
         for i, (images, targets) in enumerate(train_loader):
             if len(images) == 0:  # Check if the list of images is empty
                 logger.log_debug(
@@ -237,8 +252,21 @@ def train_model(config, model, train_loader, val_loader, device):
                 logger.log_debug(f"Targets: {targets}")
                 continue
 
+            if torch.isnan(losses):
+                logger.log_debug(
+                    f"NaN detected in losses at iteration {i} of epoch {epoch}"
+                )
+                for k, v in loss_dict.items():
+                    logger.log_debug(f"{k} loss: {v}")
+                logger.log_debug(f"Images: {images}")
+                logger.log_debug(f"Targets: {targets}")
+                continue
+
             losses = losses / accumulation_steps
             losses.backward()
+
+            # Gradient clipping
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=2.0)
 
             # Gradient clipping
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=2.0)
@@ -253,8 +281,6 @@ def train_model(config, model, train_loader, val_loader, device):
             f"Epoch {epoch+1}/{num_epochs}, Loss: {running_loss / len(train_loader)}"
         )
 
-        writer.add_scalar(f"Loss train", running_loss / len(train_loader), epoch)
-
         # Evaluate after each epoch
         accuracy, val_loss = evaluate_model(
             model, val_loader, device, iou_threshold=0.5
@@ -262,8 +288,6 @@ def train_model(config, model, train_loader, val_loader, device):
         logger.log_info(
             f"Epoch {epoch+1}/{num_epochs}, Validation Loss: {val_loss:.4f}, Accuracy: {accuracy:.4f}"
         )
-
-        writer.add_scalar(f"Loss eval", val_loss)
 
         # Adjust learning rate
         lr_scheduler.step(val_loss)
@@ -278,7 +302,6 @@ def train_model(config, model, train_loader, val_loader, device):
                 logger.log_info(f"Early stopping at epoch {epoch+1}")
                 break
 
-    writer.flush()
     torch.cuda.empty_cache()
 
 
@@ -310,8 +333,15 @@ def evaluate_model(model, data_loader, device, iou_threshold=0.5):
     correct = 0
     total = 0
     running_val_loss = 0.0
+    correct = 0
+    total = 0
+    running_val_loss = 0.0
     with torch.no_grad():
         for images, targets in data_loader:
+            if len(images) == 0:  # Check if the list of images is empty
+                logger.log_debug("No valid images in batch. Skipping...")
+                continue
+
             if len(images) == 0:  # Check if the list of images is empty
                 logger.log_debug("No valid images in batch. Skipping...")
                 continue
@@ -364,6 +394,10 @@ def main():
     val_annotation_file = config["dataset"]["dataset_Faster_R_CNN"][
         "val_annotation_file"
     ]
+    val_root = config["dataset"]["dataset_Faster_R_CNN"]["val_root"]
+    val_annotation_file = config["dataset"]["dataset_Faster_R_CNN"][
+        "val_annotation_file"
+    ]
 
     # Transformations
     transform = create_transforms(config)
@@ -376,7 +410,9 @@ def main():
     train_loader = create_data_loader(config, train_dataset)
 
     # Dataset and DataLoader for validation
-    val_dataset = BDDDataset(val_root, val_annotation_file, transforms=transform)
+    val_dataset = BDDDataset(
+        val_root, val_annotation_file, transforms=transform, filter_annotations=False
+    )
     val_valid_indices = range(
         min(500, len(val_dataset))
     )  # Limit validation set to 500 images

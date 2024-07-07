@@ -260,7 +260,9 @@ def main_Faster_R_CNN():
     train_loader = FCnn.create_data_loader(config, train_dataset)
 
     # Dataset and DataLoader for validation
-    val_dataset = FCnn.BDDDataset(val_root, val_annotation_file, transforms=transform)
+    val_dataset = FCnn.BDDDataset(
+        val_root, val_annotation_file, transforms=transform, filter_annotations=False
+    )
     val_valid_indices = range(
         min(500, len(val_dataset))
     )  # Limit validation set to 500 images
