@@ -198,13 +198,10 @@ def train_model(config, model, train_loader, val_loader, device):
     )  # Lower initial learning rate
     weight_decay = config["hyperparameters"]["weight_decay"]
     num_epochs = config["hyperparameters"]["num_epoch"]
-    num_epochs = config["hyperparameters"]["num_epoch"]
     accumulation_steps = config["hyperparameters"]["accumulation_steps"]
-    patience = config["hyperparameters"]["patience"] + 5  # Increased patience
     patience = config["hyperparameters"]["patience"] + 5  # Increased patience
 
     params = [p for p in model.parameters() if p.requires_grad]
-    optimizer = optim.Adam(params, lr=learning_rate, weight_decay=weight_decay)
     optimizer = optim.Adam(params, lr=learning_rate, weight_decay=weight_decay)
 
     # Learning rate scheduler
@@ -215,12 +212,19 @@ def train_model(config, model, train_loader, val_loader, device):
     best_val_loss = float("inf")
     early_stopping_counter = 0
 
-    best_val_loss = float("inf")
-    early_stopping_counter = 0
+    model_name = 'Faster_R_CNN.pth'
 
     for epoch in range(num_epochs):
         model.train()
-        running_loss = 0.0
+        # Load model if exists
+        model_path = os.path.join('models', model_name)
+        print(model_path)
+        if os.path.exists(model_path):
+            model.load_state_dict(torch.load(model_path, map_location=device))
+            logger.log_debug(f"Model load from {model_path}")
+        else:
+            logger.log_debug("Model train started")
+
         running_loss = 0.0
         optimizer.zero_grad()
         for i, (images, targets) in enumerate(train_loader):
@@ -252,21 +256,8 @@ def train_model(config, model, train_loader, val_loader, device):
                 logger.log_debug(f"Targets: {targets}")
                 continue
 
-            if torch.isnan(losses):
-                logger.log_debug(
-                    f"NaN detected in losses at iteration {i} of epoch {epoch}"
-                )
-                for k, v in loss_dict.items():
-                    logger.log_debug(f"{k} loss: {v}")
-                logger.log_debug(f"Images: {images}")
-                logger.log_debug(f"Targets: {targets}")
-                continue
-
             losses = losses / accumulation_steps
             losses.backward()
-
-            # Gradient clipping
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=2.0)
 
             # Gradient clipping
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=2.0)
@@ -280,7 +271,9 @@ def train_model(config, model, train_loader, val_loader, device):
         logger.log_info(
             f"Epoch {epoch+1}/{num_epochs}, Loss: {running_loss / len(train_loader)}"
         )
-
+        # Save model every epoch
+        save_model(model, model_name)
+        
         # Evaluate after each epoch
         accuracy, val_loss = evaluate_model(
             model, val_loader, device, iou_threshold=0.5
@@ -338,10 +331,6 @@ def evaluate_model(model, data_loader, device, iou_threshold=0.5):
     running_val_loss = 0.0
     with torch.no_grad():
         for images, targets in data_loader:
-            if len(images) == 0:  # Check if the list of images is empty
-                logger.log_debug("No valid images in batch. Skipping...")
-                continue
-
             if len(images) == 0:  # Check if the list of images is empty
                 logger.log_debug("No valid images in batch. Skipping...")
                 continue
