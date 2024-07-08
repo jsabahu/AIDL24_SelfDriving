@@ -38,17 +38,17 @@ except Exception as e:
 def main_LaneNet():
     # Define hyperparameters
     hparams = {
-        "batch_size": 16,
+        "batch_size": 1,
         "lr": 0.05,
         "weight_decay": 0.01,
-        "num_epochs": 5,
+        "num_epochs": 100,
     }
 
     train_dataset_file = os.path.join(
-        config["dataset"]["tusimple"]["train"]["dir"], "train.txt"
+        config["dataset"]["bdd100k"]["training_path"], "train.txt"
     )
     val_dataset_path = os.path.join(
-        config["dataset"]["tusimple"]["train"]["dir"], "val.txt"
+        config["dataset"]["bdd100k"]["training_path"], "val.txt"
     )
 
     resize_height = int(config["main"]["resize_height"])
@@ -107,6 +107,8 @@ def main_LaneNet():
         f"{hparams['num_epochs']} epochs {len(train_dataset)} training samples\n"
     )
 
+    checkpoint_path = os.path.join(config["main"]["logs_dir"], "checkpoint.pth")
+
     model, log = train_model(
         model,
         hparams=hparams,
@@ -114,6 +116,8 @@ def main_LaneNet():
         val_loader=val_loader,
         optimizer=optimizer,
         device=DEVICE,
+        resume=True,
+        checkpoint_path=checkpoint_path,
     )
 
     df = pd.DataFrame({"epoch": [], "training_loss": [], "val_loss": []})
@@ -133,7 +137,7 @@ def main_LaneNet():
     )
     logger.log_debug("training log is saved: {}".format(train_log_save_filename))
 
-    model_save_filename = f"models/Lane_Model_ENet_{time.time()}.pth"
+    model_save_filename = f"models/Lane_Model_LaneNet.pth"
     torch.save(model.state_dict(), model_save_filename)
     logger.log_debug("model is saved: {}".format(model_save_filename))
 
@@ -279,11 +283,11 @@ def main_Faster_R_CNN():
 
     # Train
     FCnn.train_model(config, model, train_loader, val_loader, device)
-    #save_model(model, "Faster_R_CNN.pth")
+    # save_model(model, "Faster_R_CNN.pth")
 
 
 if __name__ == "__main__":
-    select = "FasterRCNN"
+    select = "LaneNet"
     if select == "LaneNet":
         main_LaneNet()
     if select == "maskRCNN":
