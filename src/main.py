@@ -287,7 +287,7 @@ def main_Faster_R_CNN():
 
 
 if __name__ == "__main__":
-    select = "LaneNet"
+    select = "FasterRCNN"
     if select == "LaneNet":
         main_LaneNet()
     if select == "maskRCNN":
