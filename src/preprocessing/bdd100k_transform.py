@@ -49,12 +49,14 @@ def process_json_file(
     assert ops.exists(json_file_path), "{:s} not exist".format(json_file_path)
 
     image_nums = len(os.listdir(ori_dst_dir))
+    # json_file_path example: lane_val.json
+    phase = os.path.splitext(json_file_path)[0].split("_")[-1]
 
     with open(json_file_path, "r") as file:
         data = json.load(file)
         for line_index, info_dict in enumerate(data):
             image_name = info_dict["name"]
-            images_folder = "images/100k/train"
+            images_folder = "images/100k/" + phase
             image_path = ops.join(src_dir, images_folder, image_name)
             assert ops.exists(image_path), "{:s} not exist".format(image_path)
 
@@ -263,7 +265,9 @@ def process_bdd100k_dataset(src_dir, val_tag, test_tag):
     os.makedirs(training_folder_path, exist_ok=True)
     os.makedirs(testing_folder_path, exist_ok=True)
 
-    for json_label_path in glob.glob("{:s}/lane_labels.json".format(src_dir)):
+    for json_label_path in glob.glob(
+        "{:s}/labels/lane/polygons/*.json".format(src_dir)
+    ):
         json_label_name = ops.split(json_label_path)[1]
 
         shutil.copyfile(
@@ -279,6 +283,7 @@ def process_bdd100k_dataset(src_dir, val_tag, test_tag):
     os.makedirs(gt_instance_dir, exist_ok=True)
 
     for json_label_path in glob.glob("{:s}/*.json".format(training_folder_path)):
+        print(json_label_path)
         process_json_file(
             json_label_path, src_dir, gt_image_dir, gt_binary_dir, gt_instance_dir
         )
@@ -313,61 +318,6 @@ def process_bdd100k_dataset(src_dir, val_tag, test_tag):
     return
 
 
-import json
-import os
-
-import json
-import os
-
-
-def split_json_file(file, percentages):
-    """
-    Splits the content of a JSON file into n splits based on given percentages and writes the splits to separate files.
-
-    Args:
-    - file (str): Path to the JSON file.
-    - percentages (list of float): List of percentages for each split. The percentages should sum up to 1.
-
-    Returns:
-    - None
-    """
-
-    # Check if percentages sum up to 1
-    if sum(percentages) != 1:
-        raise ValueError("Percentages must sum up to 1")
-
-    # Read the JSON file
-    with open(file, "r") as f:
-        data = json.load(f)
-
-    # Determine the total number of items and the split points
-    total_items = len(data)
-    split_points = [int(p * total_items) for p in percentages]
-
-    # Adjust the split points to ensure the total is correct
-    split_points[-1] = total_items - sum(split_points[:-1])
-
-    start = 0
-    base_filename = os.path.splitext(file)[0]
-
-    for idx, split in enumerate(split_points):
-        end = start + split
-        split_data = data[start:end]
-        start = end
-
-        split_filename = f"{base_filename}_split_{idx + 1}.json"
-        with open(split_filename, "w") as f:
-            json.dump(split_data, f, indent=4)
-
-    print(f"Data has been split and saved into {len(split_points)} files.")
-
-
-# Example usage
-percentages = [0.5, 0.3, 0.2]  # Adjust percentages as needed
-split_json_file("data.json", percentages)
-
-
 if __name__ == "__main__":
     args = init_args()
-
     process_bdd100k_dataset(args.src_dir, args.val, args.test)

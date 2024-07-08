@@ -78,6 +78,7 @@ dataset:
     val:
       images_path: "data/bdd100k/images/100k/val"
       labels_path: "data/bdd100k/labels/lane/masks/val"
+    training_path: "data/bdd100k/training"
   tusimple:
     train:
       dir: "data/TuSimpleDataset/training"
@@ -99,8 +100,8 @@ transforms:
 main:
   log_filename: "main.log"
   logs_dir: "logs/"
-  resize_height: "720"
-  resize_width: "1280"
+  resize_height: "536"
+  resize_width: "960"
 
 
 resolution:

@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 from time import time
 import copy
 from models.LaneNet.train_lanenet import compute_loss
+import os
 
 # Initialize tensorboard writer and logger
 writer = SummaryWriter()
@@ -103,15 +104,28 @@ def train_model(
     val_loader: DataLoader,
     optimizer,
     device,
+    resume: bool = False,
+    checkpoint_path: str = "checkpoint.pth",
 ):
     t1 = time()
-    logger.log_debug("Starting model training")
-    training_log = {"epoch": [], "training_loss": [], "val_loss": []}
-    best_loss = float("inf")
-    best_model_wts = copy.deepcopy(model.state_dict())
     num_epochs = hparams["num_epochs"]
 
-    for epoch in range(num_epochs):
+    if resume and os.path.exists(checkpoint_path):
+        checkpoint = torch.load(checkpoint_path)
+        model.load_state_dict(checkpoint["model_state_dict"])
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        start_epoch = checkpoint["epoch"] + 1
+        best_loss = checkpoint["best_loss"]
+        training_log = checkpoint["training_log"]
+        logger.log_debug(f"Resuming training from epoch {start_epoch}")
+    else:
+        start_epoch = 0
+        best_loss = float("inf")
+        training_log = {"epoch": [], "training_loss": [], "val_loss": []}
+        best_model_wts = copy.deepcopy(model.state_dict())
+        logger.log_debug(f"Starting training model for {num_epochs} epochs")
+
+    for epoch in range(start_epoch, num_epochs):
         training_log["epoch"].append(epoch)
         logger.log_debug("Epoch {}/{}".format(epoch, num_epochs - 1))
         logger.log_debug("-" * 10)
@@ -152,6 +166,17 @@ def train_model(
                 if loss < best_loss:
                     best_loss = loss
                     best_model_wts = copy.deepcopy(model.state_dict())
+
+        # Save checkpoint
+        checkpoint = {
+            "epoch": epoch,
+            "model_state_dict": model.state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+            "best_loss": best_loss,
+            "training_log": training_log,
+        }
+        torch.save(checkpoint, checkpoint_path)
+        logger.log_debug(f"Checkpoint saved at epoch {epoch}")
 
     t2 = time() - t1
 
