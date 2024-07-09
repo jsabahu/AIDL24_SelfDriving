@@ -11,7 +11,7 @@
 * [Loss Function](#loss-functions)
 * [Evaluation Metrics](#evaluation-metrics)
      * [Intersection Over Union](#intersection-over-union-iou)
-     * [Mean Avergae Precision](#mean-average-precision-map)
+     * [Mean Average Precision](#mean-average-precision-map)
      * ---
 * [Computational Resources](#computational-resources)
 * [How To Run](#how-to-run)
