@@ -1,38 +1,5 @@
 # AIDL24_SelfDriving
 
-# Table of contents
-* [Motivation/Hypothesis](#1-motivation)
-* [Dataset](#dataset)
-	* [Anlaysis of the Dataset](#analysis-of-the-datset)
-* [Models Used](#models)
-  * [LaneNet](#LaneNet)
-  * [MaskRCNN](#MaskRCNN)
-  * [FasterRCNN](#FasterRCNN)
-* [Loss Function](#loss-functions)
-* [Evaluation Metrics](#evaluation-metrics)
-     * [Intersection Over Union](#intersection-over-union-iou)
-     * [Mean Average Precision](#mean-average-precision-map)
-     * ---
-* [Computational Resources](#computational-resources)
-* [How To Run](#how-to-run)
-* [Training Models](#training-Models)
-     * [Challenges](#challenges)
-     * [Exploiding Gradients](#exploding-gradients)
-     * [Predictions Positionins](#predictions-position)
-* [Transfer Learning](#transfer-learning) ???
-     * [Introduction To Transfer Learning](#introduction-to-transfer-learning)
-     * [Application of Transfer Learning](#application-of-transfer-learning-in-this-project)
-     * [Transfer Learning Code](#transfer-learning-code)
-* [Models Comparision](#models-comparison)
-* [Validation With Our Own Images](#validation-with-our-own-images)
-* [Conclusion And Future Work](#conclusion-and-future-work)
-* [References](#references)
-
-Certainly. I'll revise the README content to match the table of contents you've provided:
-
-```markdown
-# AIDL24_SelfDriving
-
 ## Table of contents
 * [Motivation/Hypothesis](#1-motivation)
 * [Dataset](#dataset)
