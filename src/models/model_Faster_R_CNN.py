@@ -212,12 +212,12 @@ def train_model(config, model, train_loader, val_loader, device):
     best_val_loss = float("inf")
     early_stopping_counter = 0
 
-    model_name = 'Faster_R_CNN.pth'
+    model_name = "Faster_R_CNN.pth"
 
     for epoch in range(num_epochs):
         model.train()
         # Load model if exists
-        model_path = os.path.join('models', model_name)
+        model_path = os.path.join("models", model_name)
         print(model_path)
         if os.path.exists(model_path):
             model.load_state_dict(torch.load(model_path, map_location=device))
@@ -273,7 +273,7 @@ def train_model(config, model, train_loader, val_loader, device):
         )
         # Save model every epoch
         save_model(model, model_name)
-        
+
         # Evaluate after each epoch
         accuracy, val_loss = evaluate_model(
             model, val_loader, device, iou_threshold=0.5

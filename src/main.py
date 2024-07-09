@@ -259,7 +259,7 @@ def main_Faster_R_CNN():
     # Dataset and DataLoader for training
     train_dataset = FCnn.BDDDataset(root, annotation_file, transforms=transform)
     train_dataset = FCnn.Subset(
-        train_dataset, range(5)
+        train_dataset, range(100)
     )  # Limit training set to 500 images
     train_loader = FCnn.create_data_loader(config, train_dataset)
 
@@ -268,7 +268,7 @@ def main_Faster_R_CNN():
         val_root, val_annotation_file, transforms=transform, filter_annotations=False
     )
     val_valid_indices = range(
-        min(5, len(val_dataset))
+        min(100, len(val_dataset))
     )  # Limit validation set to 500 images
     val_dataset = FCnn.Subset(val_dataset, val_valid_indices)
     val_loader = FCnn.create_data_loader(config, val_dataset)
@@ -287,7 +287,7 @@ def main_Faster_R_CNN():
 
 
 if __name__ == "__main__":
-    select = "LaneNet"
+    select = "FasterRCNN"
     if select == "LaneNet":
         main_LaneNet()
     if select == "maskRCNN":

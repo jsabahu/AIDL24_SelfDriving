@@ -121,5 +121,5 @@ hyperparameters:
   step_size: 3
   gamma: 0.1
   num_epoch: 15
-  accumulation_steps: 4
-  patience: 3
+  accumulation_steps: 8
+  patience: 15
