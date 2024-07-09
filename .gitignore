@@ -26,3 +26,4 @@ logs/
 runs/
 *.pth
 test_output/
+*.log
