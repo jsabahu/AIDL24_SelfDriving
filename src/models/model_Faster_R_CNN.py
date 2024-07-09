@@ -1,6 +1,5 @@
 import os
 import torch
-from torchvision.ops import box_iou
 import torchvision
 import json
 import yaml
@@ -12,11 +11,10 @@ from torchvision.models.detection.faster_rcnn import (
     FasterRCNN_ResNet50_FPN_Weights,
 )
 import torch.optim as optim
-from torch.optim.lr_scheduler import ReduceLROnPlateau, LinearLR, SequentialLR
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.tensorboard import SummaryWriter
 from utils import save_model
 from logger import Logger
-from torchmetrics.detection.mean_ap import MeanAveragePrecision
 
 """
 # Simple Logger class implementation
@@ -55,16 +53,19 @@ def create_transforms(config):
     transform = transforms.Compose(
         [
             transforms.ToTensor(),
-            transforms.Resize((resize_height, resize_width), antialias=antialias),
+            transforms.Resize(
+                (resize_height, resize_width), antialias=antialias
+            ),  # Explicitly set antialias from config
             transforms.RandomHorizontalFlip(0.5),
             transforms.ColorJitter(
-                brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1
+                brightness=0.4, contrast=0.4, saturation=0.4, hue=0.4
             ),
-            transforms.RandomRotation(15),
+            transforms.RandomRotation(30),  # Increased rotation for augmentation
             transforms.RandomResizedCrop(
-                (resize_height, resize_width), scale=(0.8, 1.0), antialias=antialias
-            ),
-            transforms.RandomApply([transforms.GaussianBlur(kernel_size=3)], p=0.3),
+                (resize_height, resize_width), scale=(0.4, 1.0), antialias=antialias
+            ),  # More aggressive random crop
+            transforms.RandomApply([transforms.GaussianBlur(kernel_size=3)], p=0.5),
+            transforms.RandomPerspective(distortion_scale=0.5, p=0.5),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ]
     )
@@ -187,48 +188,81 @@ def create_model(num_classes):
 
 def train_model(config, model, train_loader, val_loader, device):
     learning_rate = (
-        config["hyperparameters"]["learning_rate"] * 0.1
+        config["hyperparameters"]["learning_rate"] * 0.01
+    )  # Lower initial learning rate
+
+
+def train_model(config, model, train_loader, val_loader, device):
+    learning_rate = (
+        config["hyperparameters"]["learning_rate"] * 0.01
     )  # Lower initial learning rate
     weight_decay = config["hyperparameters"]["weight_decay"]
     num_epochs = config["hyperparameters"]["num_epoch"]
-    accumulation_steps = 8  # Increased from 4
-    patience = 15  # Increased from 10
-    warmup_epochs = 5
+    accumulation_steps = config["hyperparameters"]["accumulation_steps"]
+    patience = config["hyperparameters"]["patience"] + 5  # Increased patience
 
     params = [p for p in model.parameters() if p.requires_grad]
     optimizer = optim.Adam(params, lr=learning_rate, weight_decay=weight_decay)
 
     # Learning rate scheduler
     lr_scheduler = ReduceLROnPlateau(
-        optimizer, mode="max", factor=0.5, patience=3, verbose=True
+        optimizer, "min", patience=3, factor=0.1, verbose=True
     )
 
-    best_map_score = 0
+    best_val_loss = float("inf")
     early_stopping_counter = 0
+
+    model_name = "Faster_R_CNN.pth"
 
     for epoch in range(num_epochs):
         model.train()
+        # Load model if exists
+        model_path = os.path.join("models", model_name)
+        print(model_path)
+        if os.path.exists(model_path):
+            model.load_state_dict(torch.load(model_path, map_location=device))
+            logger.log_debug(f"Model load from {model_path}")
+        else:
+            logger.log_debug("Model train started")
+
         running_loss = 0.0
         optimizer.zero_grad()
-
-        # Warmup phase
-        if epoch < warmup_epochs:
-            lr_scale = min(1.0, float(epoch + 1) / warmup_epochs)
-            for pg in optimizer.param_groups:
-                pg["lr"] = lr_scale * learning_rate
-
         for i, (images, targets) in enumerate(train_loader):
+            if len(images) == 0:  # Check if the list of images is empty
+                logger.log_debug(
+                    f"No valid images in batch at iteration {i}. Skipping..."
+                )
+                continue
+            else:
+                logger.log_debug(
+                    f"{len(images)} valid images in batch at iteration {i}."
+                )
             images = list(image.to(device) for image in images)
             targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
+
+            if any(len(t["boxes"]) == 0 for t in targets):
+                continue
 
             loss_dict = model(images, targets)
             losses = sum(loss for loss in loss_dict.values())
 
+            if torch.isnan(losses):
+                logger.log_debug(
+                    f"NaN detected in losses at iteration {i} of epoch {epoch}"
+                )
+                for k, v in loss_dict.items():
+                    logger.log_debug(f"{k} loss: {v}")
+                logger.log_debug(f"Images: {images}")
+                logger.log_debug(f"Targets: {targets}")
+                continue
+
             losses = losses / accumulation_steps
             losses.backward()
 
+            # Gradient clipping
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=2.0)
+
             if (i + 1) % accumulation_steps == 0:
-                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
                 optimizer.step()
                 optimizer.zero_grad()
 
@@ -237,33 +271,31 @@ def train_model(config, model, train_loader, val_loader, device):
         logger.log_info(
             f"Epoch {epoch+1}/{num_epochs}, Loss: {running_loss / len(train_loader)}"
         )
+        # Save model every epoch
+        save_model(model, model_name)
 
         # Evaluate after each epoch
-        val_accuracy, map_score = evaluate_model(model, val_loader, device)
+        accuracy, val_loss = evaluate_model(
+            model, val_loader, device, iou_threshold=0.5
+        )  # Adjusted IoU threshold for evaluation
         logger.log_info(
-            f"Epoch {epoch+1}/{num_epochs}, "
-            f"Validation Accuracy: {val_accuracy:.4f}, Validation mAP: {map_score:.4f}"
+            f"Epoch {epoch+1}/{num_epochs}, Validation Loss: {val_loss:.4f}, Accuracy: {accuracy:.4f}"
         )
 
-        # Adjust learning rate after warmup phase
-        if epoch >= warmup_epochs:
-            lr_scheduler.step(map_score)
+        # Adjust learning rate
+        lr_scheduler.step(val_loss)
 
-        # Early stopping and best model saving
-        if map_score > best_map_score:
-            best_map_score = map_score
+        # Early stopping check
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
             early_stopping_counter = 0
-            save_model(model, "best_Faster_R_CNN.pth")
         else:
             early_stopping_counter += 1
             if early_stopping_counter >= patience:
                 logger.log_info(f"Early stopping at epoch {epoch+1}")
                 break
 
-    # Save the final model
-    save_model(model, "final_Faster_R_CNN.pth")
-
-    # torch.cuda.empty_cache()
+    torch.cuda.empty_cache()
 
 
 def compute_iou(box1, box2):
@@ -291,34 +323,53 @@ def compute_iou(box1, box2):
 
 def evaluate_model(model, data_loader, device, iou_threshold=0.5):
     model.eval()
-    correct_detections = 0
-    total_images = 0
-    metric = MeanAveragePrecision(iou_type="bbox")
-
+    correct = 0
+    total = 0
+    running_val_loss = 0.0
+    correct = 0
+    total = 0
+    running_val_loss = 0.0
     with torch.no_grad():
         for images, targets in data_loader:
+            if len(images) == 0:  # Check if the list of images is empty
+                logger.log_debug("No valid images in batch. Skipping...")
+                continue
+
             images = list(image.to(device) for image in images)
             targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
-            # Get predictions
+            # Perform the prediction
             predictions = model(images)
 
-            # Update mAP metric
-            metric.update(predictions, targets)
+            for target, prediction in zip(targets, predictions):
+                gt_boxes = target["boxes"].cpu()
+                pred_boxes = prediction["boxes"].cpu()
+                if len(pred_boxes) == 0:
+                    continue
 
-            # Simple accuracy calculation
-            for pred, target in zip(predictions, targets):
-                if len(pred["boxes"]) > 0 and len(target["boxes"]) > 0:
-                    # Consider detection correct if any predicted box has IoU > threshold with any target box
-                    ious = box_iou(pred["boxes"], target["boxes"])
-                    if ious.max() > iou_threshold:
-                        correct_detections += 1
-                total_images += 1
+                val_loss = sum(
+                    [
+                        compute_iou(pred_box, gt_box)
+                        for pred_box in pred_boxes
+                        for gt_box in gt_boxes
+                    ]
+                ) / len(pred_boxes)
+                running_val_loss += val_loss
 
-    accuracy = correct_detections / total_images if total_images > 0 else 0
-    map_score = metric.compute()["map"]
+                for pred_box in pred_boxes:
+                    iou_scores = [compute_iou(pred_box, gt_box) for gt_box in gt_boxes]
+                    if max(iou_scores) > iou_threshold:
+                        correct += 1
+                    total += 1
 
-    return accuracy, map_score
+                # Log details for debugging
+                # logger.log_debug(f"Ground Truth Boxes: {gt_boxes}")
+                # logger.log_debug(f"Predicted Boxes: {pred_boxes}")
+                # logger.log_debug(f"IOU Scores: {iou_scores}")
+
+    accuracy = correct / total if total > 0 else 0
+    val_loss = running_val_loss / len(data_loader) if len(data_loader) > 0 else 0
+    return accuracy, val_loss
 
 
 def main():
@@ -352,7 +403,7 @@ def main():
         val_root, val_annotation_file, transforms=transform, filter_annotations=False
     )
     val_valid_indices = range(
-        min(1000, len(val_dataset))
+        min(500, len(val_dataset))
     )  # Limit validation set to 500 images
     val_dataset = Subset(val_dataset, val_valid_indices)
     val_loader = create_data_loader(config, val_dataset)
