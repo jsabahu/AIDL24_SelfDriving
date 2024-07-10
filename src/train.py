@@ -28,7 +28,7 @@ except Exception as e:
 
 
 def single_epoch_lane_model(
-    model, dataloader, optimizer, device, phase, loss_type="FocalLoss"
+    model, dataloader, optimizer, device, phase, epoch, loss_type="FocalLoss"
 ):
     """
     Train or val the lane detection model for a single epoch.
@@ -78,7 +78,7 @@ def single_epoch_lane_model(
         # acc = binary_accuracy(outputs_flat, masks_flat, threshold=0.5)
 
         logger.log_debug(
-            f"{phase} phase: Step {step}/{len(dataloader)}: loss={running_loss}, loss_b={running_loss_b}, loss_i={running_loss_i}, acc=Nocomputed"
+            f"Epoch: {epoch} {phase} phase: Step {step}/{len(dataloader)}: loss={running_loss}, loss_b={running_loss_b}, loss_i={running_loss_i}, acc=Nocomputed"
         )
 
         losses.append(running_loss)
@@ -138,6 +138,7 @@ def train_model(
                     dataloader=train_loader,
                     optimizer=optimizer,
                     device=device,
+                    epoch=epoch,
                     phase=phase,
                 )
             elif phase == "val":
@@ -146,6 +147,7 @@ def train_model(
                     dataloader=val_loader,
                     optimizer=optimizer,
                     device=device,
+                    epoch=epoch,
                     phase=phase,
                 )
 
@@ -166,6 +168,7 @@ def train_model(
                 if loss < best_loss:
                     best_loss = loss
                     best_model_wts = copy.deepcopy(model.state_dict())
+                    torch.save(model.state_dict(), checkpoint_path + "_model.pth")
 
         # Save checkpoint
         checkpoint = {
