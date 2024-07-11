@@ -114,7 +114,7 @@ hyperparameters:
   batch_size: 1
   shuffle: True
   num_workers: 4
-  num_classes: 2  # 1 class (car) + background
+  num_classes: 1  # 1 class (car+truck)
   learning_rate: 0.005
   momentum: 0.9
   weight_decay: 0.0005
