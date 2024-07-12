@@ -159,17 +159,50 @@ FPN enhances feature extraction:
 
 ## Loss Functions
 
-We implement custom loss functions tailored to each model's architecture and task requirements.
+The Faster R-CNN model typically uses a multi-task loss function that combines several components:
+
+## 1. Classification Loss
+
+- Type: Cross-Entropy Loss
+- Purpose: Measures the error in classifying the object (e.g., car or truck)
+- Applied to: Both the Region Proposal Network (RPN) and the final classifier
+
+## 2. Bounding Box Regression Loss
+
+- Type: Smooth L1 Loss (also known as Huber Loss)
+- Purpose: Measures the error in predicting the bounding box coordinates
+- Applied to: Both the RPN and the final regressor
+- Advantage: Less sensitive to outliers compared to standard L2 loss
+
+## 3. Objectness Loss
+
+- Type: Binary Cross-Entropy Loss
+- Purpose: Measures the error in predicting whether a region contains an object or not
+- Applied to: RPN
+
+## Combined Loss Function
+
+The total loss is a weighted sum of these components:
+L_total = λ_cls * L_cls + λ_box * L_box + λ_rpn_cls * L_rpn_cls + λ_rpn_box * L_rpn_box
+
 
 ## Evaluation Metrics
 
-### Intersection Over Union (IoU)
+The code uses two primary metrics for evaluation: Accuracy and Validation Loss. These are calculated in the `evaluate_model` function.
 
-IoU is used to measure the accuracy of our object detection and segmentation models by comparing predicted bounding boxes with ground truth.
+## 1. Accuracy
 
-### Mean Average Precision (mAP)
+The accuracy metric in this implementation is based on the Intersection over Union (IoU) between predicted and ground truth bounding boxes.
 
-mAP helps us evaluate the overall performance of our models across different object classes and detection thresholds.
+### Calculation Process:
+1. For each image in the validation set:
+   - Compare each ground truth box with all predicted boxes
+   - Calculate IoU for each pair
+   - A prediction is considered correct if its IoU with a ground truth box exceeds a threshold (not explicitly defined in the code, typically 0.5)
+
+2. Accuracy is then calculated as:
+Accuracy = Number of Correct Predictions / Total Number of Ground Truth Boxes
+
 
 ## Computational Resources
 
