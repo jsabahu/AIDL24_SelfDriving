@@ -62,28 +62,45 @@ LaneNet is our primary model for lane detection. It employs a segmentation-based
 
 ### MaskRCNN
 
-The model is designed to perform lane detection using a combination of convolutional neural network (CNN) layers, feature pyramid networks (FPN), region of interest (RoI) alignment, and semantic segmentation heads.
-Components
+This model is designed to perform lane detection using a combination of convolutional neural network (CNN) layers, feature pyramid networks (FPN), region of interest (RoI) alignment, and semantic segmentation heads.
 
-CustomBackbone
+## Components
 
-This component is a convolutional neural network that extracts feature maps from input images. It uses several convolutional layers, batch normalization, and ReLU activations. The feature maps are extracted through a series of layers:
+# CustomBackbone
 
-FeaturePyramidNetwork
+This component is a convolutional neural network that extracts feature maps from input images. It uses:
+- Several convolutional layers
+- Batch normalization
+- ReLU activations
 
-The FPN creates feature pyramids from the backbone's output. It combines feature maps from different levels (layers) to build multi-scale feature maps, which are useful for detecting objects at various scales.
+The feature maps are extracted through a series of layers.
 
-PyramidRoIAlign
+# FeaturePyramidNetwork
 
-This module aligns Regions of Interest (RoIs) of different sizes to a fixed size using feature maps from the FPN. It uses the spatial scale of the feature maps to properly resize and align the RoIs, distributing them to different levels of the pyramid based on their size.
+The FPN creates feature pyramids from the backbone's output. It:
+- Combines feature maps from different levels (layers)
+- Builds multi-scale feature maps
+- Useful for detecting objects at various scales
 
-SemanticLaneHead
+# PyramidRoIAlign
 
-This head performs semantic segmentation for lane detection. It consists of multiple convolutional layers followed by a deconvolutional (upsampling) layer and a final convolutional layer to produce the segmentation mask logits.
+This module aligns Regions of Interest (RoIs) of different sizes to a fixed size using feature maps from the FPN. It:
+- Uses the spatial scale of the feature maps to properly resize and align the RoIs
+- Distributes RoIs to different levels of the pyramid based on their size
 
-LaneDetectionModel
+# SemanticLaneHead
 
-This is the complete model that integrates all the components. It takes images and RoIs as input, processes them through the backbone, FPN, RoI align, and the semantic lane head to produce the final lane detection mask logits.
+This head performs semantic segmentation for lane detection. It consists of:
+- Multiple convolutional layers
+- A deconvolutional (upsampling) layer
+- A final convolutional layer to produce the segmentation mask logits
+
+# LaneDetectionModel
+
+This is the complete model that integrates all the components. It:
+- Takes images and RoIs as input
+- Processes them through the backbone, FPN, RoI align, and the semantic lane head
+- Produces the final lane detection mask logits
 
 
 ### FasterRCNN
