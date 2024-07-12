@@ -58,7 +58,17 @@ The BDD100K dataset is a comprehensive collection of 100,000 images capturing di
 
 ### LaneNet
 
-LaneNet is our primary model for lane detection. It employs a segmentation-based approach to identify and classify lane markings accurately.
+LaneNet is our primary model for lane detection. It is a convolutional neural network (CNN) model designed specifically for lane detection in autonomous driving applications, which is crucial for tasks such as lane keeping, lane changing, and overall vehicle navigation.It employs a segmentation-based approach to identify and classify lane markings accurately.
+
+#### Architecture
+##### 1. Encoder-Decoder Structure:
+LaneNet employs an encoder-decoder architecture to process input images and generate lane detection results. The encoder extracts high-level features from the input image using a series of convolutional layers, while the decoder reconstructs the spatial details to produce pixel-wise lane markings.
+
+##### 2. Instance Segmentation:
+LaneNet uses a semantic segmentation approach combined with instance segmentation. The model segments the image into lane and non-lane regions and differentiates between individual lane markings. This dual approach allows LaneNet to handle multiple lanes simultaneously and distinguish between them.
+
+##### 3. Embedding Learning:
+A key feature of LaneNet is its use of embedding vectors. For each pixel classified as a lane, the network assigns an embedding vector that helps cluster pixels belonging to the same lane. This clustering is achieved through a discriminative loss function that encourages pixels of the same lane to have similar embeddings while separating different lanes.
 
 ### MaskRCNN
 
