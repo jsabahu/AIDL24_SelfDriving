@@ -3,7 +3,7 @@
 ## Table of contents
 * [Motivation/Hypothesis](#1-motivation)
 * [Dataset](#dataset)
- * [Analysis of the Dataset](#analysis-of-the-datset)
+  * [Analysis of the Dataset](#analysis-of-the-datset)
 * [Models Used](#models)
   * [LaneNet](#lanenet)
   * [MaskRCNN](#maskrcnn)
