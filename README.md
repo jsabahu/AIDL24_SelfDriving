@@ -3,7 +3,7 @@
 ## Table of contents
 * [Motivation/Hypothesis](#1-motivation)
 * [Dataset](#dataset)
-* [Analysis of the Dataset](#analysis-of-the-datset)
+ * [Analysis of the Dataset](#analysis-of-the-datset)
 * [Models Used](#models)
   * [LaneNet](#lanenet)
   * [MaskRCNN](#maskrcnn)
@@ -33,11 +33,26 @@ Our project aims to advance the field of autonomous driving through improved com
 
 ## Dataset
 
-We utilize [Dataset Name], which contains [X] images of diverse road scenes. This dataset is crucial for our project due to its comprehensive coverage of various driving conditions and high-quality annotations.
+We use [BDD100K Dataset](https://www.vis.xyz/bdd100k/), which contains 100.000 images of diverse road scenes. This dataset is crucial for our project due to its comprehensive coverage of various driving conditions and high-quality annotations.\
+You can download the dataset from [here](https://dl.cv.ethz.ch/bdd100k/data/)
 
-## Analysis of the Dataset
+### Analysis of the Dataset
 
-Our dataset comprises [X] training images and [Y] validation images. We've conducted thorough preprocessing, including normalization and augmentation, to optimize model performance.
+The BDD100K dataset is a comprehensive collection of 100,000 images capturing diverse road scenes. This dataset is pivotal for projects involving autonomous driving, computer vision, and scene understanding due to its extensive coverage of various driving conditions and high-quality annotations.
+
+#### 1. Overview
+
+* **Number of Images**: 100,000
+* **Resolution**: 1280x720 pixels
+* **Annotations**: Multiple types including object detection, lane marking, drivable area, and segmentation.
+* **Driving Conditions**: Diverse, covering different weather conditions, times of day, and various locations.
+
+#### 2. Data Types and Annotations
+* **Object Detection**: Bounding boxes for objects such as cars, pedestrians, traffic signs, and cyclists.
+* **Lane Marking**: Polylines indicating the position of lane markings on the road.
+* **Drivable Area**: Segmentation maps identifying areas that are drivable.
+* **Semantic Segmentation**: Pixel-level labels for different objects and regions in the image.
+* **Instance Segmentation**: Pixel-level labels with instance information for objects.
 
 ## Models
 
