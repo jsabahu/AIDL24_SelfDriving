@@ -103,9 +103,62 @@ This is the complete model that integrates all the components. It:
 - Produces the final lane detection mask logits
 
 
-### FasterRCNN
+### Faster R-CNN with ResNet50-FPN
 
-FasterRCNN is our chosen model for object detection, providing rapid and accurate identification of various objects on the road.
+## Faster R-CNN Architecture
+
+Faster R-CNN is a two-stage object detection algorithm:
+
+### Region Proposal Network (RPN)
+- Scans the image and proposes potential object regions
+- Uses anchor boxes of various sizes and aspect ratios
+- Outputs "objectness" scores and rough bounding box coordinates
+
+### Fast R-CNN
+- Takes proposed regions from RPN
+- Performs classification (what object is it?)
+- Refines bounding box coordinates
+
+## ResNet50 Backbone
+
+ResNet50 is a deep convolutional neural network with 50 layers:
+
+- Uses residual connections (skip connections)
+- Allows training of very deep networks by addressing vanishing gradient problem
+- Composed of repetitive blocks:
+  - Convolutional layers
+  - Batch normalization
+  - ReLU activation functions
+
+## Feature Pyramid Network (FPN)
+
+FPN enhances feature extraction:
+
+- Creates a multi-scale feature pyramid
+- Top-down pathway: Upsamples spatially coarser, but semantically stronger features
+- Lateral connections: Merges features from the bottom-up and top-down pathways
+- Helps detect objects across a wide range of scales
+
+## Pre-trained Weights (COCO_V1)
+
+- COCO (Common Objects in Context) dataset:
+  - 330K images
+  - 1.5 million object instances
+  - 80 object categories
+- Pre-training on COCO provides a strong starting point for transfer learning
+
+## Customization Options
+
+- Modify number of classes for your specific task
+- Adjust anchor sizes and aspect ratios
+- Fine-tune learning rates and other hyperparameters
+- Freeze/unfreeze different parts of the network during training
+
+## Performance Considerations
+
+- Inference speed vs accuracy trade-off
+- GPU memory requirements
+- Potential for model quantization or pruning for deployment on resource-constrained devices
 
 ## Loss Functions
 
