@@ -62,7 +62,29 @@ LaneNet is our primary model for lane detection. It employs a segmentation-based
 
 ### MaskRCNN
 
-We use MaskRCNN for instance segmentation, allowing us to precisely identify and locate objects in the driving scene.
+The model is designed to perform lane detection using a combination of convolutional neural network (CNN) layers, feature pyramid networks (FPN), region of interest (RoI) alignment, and semantic segmentation heads.
+Components
+
+CustomBackbone
+
+This component is a convolutional neural network that extracts feature maps from input images. It uses several convolutional layers, batch normalization, and ReLU activations. The feature maps are extracted through a series of layers:
+
+FeaturePyramidNetwork
+
+The FPN creates feature pyramids from the backbone's output. It combines feature maps from different levels (layers) to build multi-scale feature maps, which are useful for detecting objects at various scales.
+
+PyramidRoIAlign
+
+This module aligns Regions of Interest (RoIs) of different sizes to a fixed size using feature maps from the FPN. It uses the spatial scale of the feature maps to properly resize and align the RoIs, distributing them to different levels of the pyramid based on their size.
+
+SemanticLaneHead
+
+This head performs semantic segmentation for lane detection. It consists of multiple convolutional layers followed by a deconvolutional (upsampling) layer and a final convolutional layer to produce the segmentation mask logits.
+
+LaneDetectionModel
+
+This is the complete model that integrates all the components. It takes images and RoIs as input, processes them through the backbone, FPN, RoI align, and the semantic lane head to produce the final lane detection mask logits.
+
 
 ### FasterRCNN
 
