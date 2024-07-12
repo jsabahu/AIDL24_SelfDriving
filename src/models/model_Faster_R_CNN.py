@@ -56,7 +56,14 @@ def create_transforms(config):
 
 
 class BDDDataset(Dataset):
-    def __init__(self, root, annotation_file, config, transforms=None, filter_annotations=True, ):
+    def __init__(
+        self,
+        root,
+        annotation_file,
+        config,
+        transforms=None,
+        filter_annotations=True,
+    ):
         self.root = root
         self.transforms = transforms
         self.filter_annotations = filter_annotations
@@ -73,7 +80,8 @@ class BDDDataset(Dataset):
         valid_annotations = []
         for ann in annotations:
             if "labels" in ann and any(
-                obj["category"] == "car" or obj["category"] == "truck" for obj in ann["labels"]
+                obj["category"] == "car" or obj["category"] == "truck"
+                for obj in ann["labels"]
             ):
                 valid_annotations.append(ann)
 
@@ -94,13 +102,17 @@ class BDDDataset(Dataset):
             return None
 
         img = Image.open(img_path).convert("RGB")
-        scale_width =self.config["transforms"]["resize_width"] / img.size[0]
+        scale_width = self.config["transforms"]["resize_width"] / img.size[0]
         scale_heigh = self.config["transforms"]["resize_height"] / img.size[1]
         boxes = []
         labels = []
         if "labels" in ann:
             for obj in ann["labels"]:
-                if not self.filter_annotations or obj["category"] == "car" or obj["category"] == "truck":
+                if (
+                    not self.filter_annotations
+                    or obj["category"] == "car"
+                    or obj["category"] == "truck"
+                ):
                     x_min, y_min, x_max, y_max = (
                         obj["box2d"]["x1"] * scale_width,
                         obj["box2d"]["y1"] * scale_heigh,
@@ -108,7 +120,7 @@ class BDDDataset(Dataset):
                         obj["box2d"]["y2"] * scale_heigh,
                     )
                     boxes.append([x_min, y_min, x_max, y_max])
-                    if (obj["category"] == "car" or obj["category"]):
+                    if obj["category"] == "car" or obj["category"]:
                         labels.append(0)  # Car or Truck label
 
         if len(boxes) == 0:
@@ -151,7 +163,7 @@ def create_data_loader(config, dataset):
 
 
 def create_model(num_classes):
-    
+
     # Function to set random seeds for reproducibility
     def set_seed(seed):
         torch.manual_seed(seed)
@@ -160,7 +172,7 @@ def create_model(num_classes):
         random.seed(seed)
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
-    
+
     # Set seeds for reproducibility
     set_seed(10)
 
@@ -168,7 +180,7 @@ def create_model(num_classes):
     model = torchvision.models.detection.fasterrcnn_resnet50_fpn(
         weights=FasterRCNN_ResNet50_FPN_Weights.COCO_V1
     )
-    
+
     # Get the number of input features for the classifier
     in_features = model.roi_heads.box_predictor.cls_score.in_features
 
@@ -177,10 +189,11 @@ def create_model(num_classes):
 
     return model
 
+
 def train_model(config, model, train_loader, val_loader, device):
-    learning_rate = (
-        config["hyperparameters"]["learning_rate"]
-    )  # Lower initial learning rate
+    learning_rate = config["hyperparameters"][
+        "learning_rate"
+    ]  # Lower initial learning rate
     weight_decay = config["hyperparameters"]["weight_decay"]
     num_epochs = config["hyperparameters"]["num_epoch"]
     accumulation_steps = config["hyperparameters"]["accumulation_steps"]
@@ -197,12 +210,12 @@ def train_model(config, model, train_loader, val_loader, device):
     best_val_loss = float("inf")
     early_stopping_counter = 0
 
-    model_name = 'Faster_R_CNN.pth'
+    model_name = "Faster_R_CNN.pth"
 
     for epoch in range(num_epochs):
         model.train()
         # Load model if exists
-        model_path = os.path.join('models', model_name)
+        model_path = os.path.join("models", model_name)
         print(model_path)
         if os.path.exists(model_path):
             state_dict = torch.load(model_path, map_location=device)
@@ -257,12 +270,12 @@ def train_model(config, model, train_loader, val_loader, device):
         logger.log_info(
             f"Epoch {epoch+1}/{num_epochs}, Loss: {running_loss / len(train_loader)}"
         )
-               
+
         writer.add_scalar(f"Loss train", running_loss / len(train_loader), epoch)
 
         # Save model every epoch
         save_model(model, model_name)
-        
+
         # Evaluate after each epoch
         accuracy, val_loss = evaluate_model(
             model, val_loader, device, iou_threshold=0.5
@@ -338,17 +351,17 @@ def evaluate_model(model, data_loader, device, iou_threshold=0.5):
                 val_loss = 0
 
                 for gt_box in gt_boxes:
-                    iou_scores = [compute_iou(pred_box, gt_box) for pred_box in pred_boxes]
+                    iou_scores = [
+                        compute_iou(pred_box, gt_box) for pred_box in pred_boxes
+                    ]
                     if iou_scores:
                         val_loss += max(iou_scores)
                     else:
                         val_loss += float("inf")
 
-                running_val_loss += val_loss / len(gt_boxes) if len(gt_boxes) > 0 else float("inf")
-
-                for pred_box in pred_boxes:
-                    if max(iou_scores) > iou_threshold:
-                        correct += 1
+                running_val_loss += (
+                    val_loss / len(gt_boxes) if len(gt_boxes) > 0 else float("inf")
+                )
 
     accuracy = correct / total if total > 0 else 0
     val_loss = running_val_loss / len(data_loader) if len(data_loader) > 0 else 0
