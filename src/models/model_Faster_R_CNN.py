@@ -277,9 +277,8 @@ def train_model(config, model, train_loader, val_loader, device):
         save_model(model, model_name)
 
         # Evaluate after each epoch
-        accuracy, val_loss = evaluate_model(
-            model, val_loader, device, iou_threshold=0.5
-        )  # Adjusted IoU threshold for evaluation
+        accuracy, val_loss = evaluate_model(model, val_loader, device)
+        # Adjusted IoU threshold for evaluation
         logger.log_info(
             f"Epoch {epoch+1}/{num_epochs}, Validation Loss: {val_loss:.4f}, Accuracy: {accuracy:.4f}"
         )
@@ -327,7 +326,7 @@ def compute_iou(box1, box2):
     return iou
 
 
-def evaluate_model(model, data_loader, device, iou_threshold=0.5):
+def evaluate_model(model, data_loader, device):
     model.eval()
     correct = 0
     total = 0
