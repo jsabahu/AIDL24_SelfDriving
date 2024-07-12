@@ -257,18 +257,18 @@ def main_Faster_R_CNN():
     transform = FCnn.create_transforms(config)
 
     # Dataset and DataLoader for training
-    train_dataset = FCnn.BDDDataset(root, annotation_file, transforms=transform)
+    train_dataset = FCnn.BDDDataset(root, annotation_file, config, transforms=transform)
     train_dataset = FCnn.Subset(
-        train_dataset, range(100)
+        train_dataset, range(5)
     )  # Limit training set to 500 images
     train_loader = FCnn.create_data_loader(config, train_dataset)
 
     # Dataset and DataLoader for validation
     val_dataset = FCnn.BDDDataset(
-        val_root, val_annotation_file, transforms=transform, filter_annotations=False
+        val_root, val_annotation_file, config, transforms=transform, filter_annotations=False
     )
     val_valid_indices = range(
-        min(100, len(val_dataset))
+        min(5, len(val_dataset))
     )  # Limit validation set to 500 images
     val_dataset = FCnn.Subset(val_dataset, val_valid_indices)
     val_loader = FCnn.create_data_loader(config, val_dataset)
