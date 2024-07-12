@@ -74,9 +74,9 @@ A key feature of LaneNet is its use of embedding vectors. For each pixel classif
 
 This model is designed to perform lane detection using a combination of convolutional neural network (CNN) layers, feature pyramid networks (FPN), region of interest (RoI) alignment, and semantic segmentation heads.
 
-## Components
+#### Components
 
-#### CustomBackbone
+##### CustomBackbone
 
 This component is a convolutional neural network that extracts feature maps from input images. It uses:
 - Several convolutional layers
@@ -85,27 +85,27 @@ This component is a convolutional neural network that extracts feature maps from
 
 The feature maps are extracted through a series of layers.
 
-#### FeaturePyramidNetwork
+##### FeaturePyramidNetwork
 
 The FPN creates feature pyramids from the backbone's output. It:
 - Combines feature maps from different levels (layers)
 - Builds multi-scale feature maps
 - Useful for detecting objects at various scales
 
-#### PyramidRoIAlign
+##### PyramidRoIAlign
 
 This module aligns Regions of Interest (RoIs) of different sizes to a fixed size using feature maps from the FPN. It:
 - Uses the spatial scale of the feature maps to properly resize and align the RoIs
 - Distributes RoIs to different levels of the pyramid based on their size
 
-#### SemanticLaneHead
+##### SemanticLaneHead
 
 This head performs semantic segmentation for lane detection. It consists of:
 - Multiple convolutional layers
 - A deconvolutional (upsampling) layer
 - A final convolutional layer to produce the segmentation mask logits
 
-#### LaneDetectionModel
+##### LaneDetectionModel
 
 This is the complete model that integrates all the components. It:
 - Takes images and RoIs as input
@@ -156,19 +156,6 @@ FPN enhances feature extraction:
   - 1.5 million object instances
   - 80 object categories
 - Pre-training on COCO provides a strong starting point for transfer learning
-
-## Customization Options
-
-- Modify number of classes for your specific task
-- Adjust anchor sizes and aspect ratios
-- Fine-tune learning rates and other hyperparameters
-- Freeze/unfreeze different parts of the network during training
-
-## Performance Considerations
-
-- Inference speed vs accuracy trade-off
-- GPU memory requirements
-- Potential for model quantization or pruning for deployment on resource-constrained devices
 
 ## Loss Functions
 
