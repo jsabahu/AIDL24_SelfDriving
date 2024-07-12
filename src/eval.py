@@ -61,7 +61,7 @@ def eval_mask_rCNN(model, hparams, eval_loader, rois, device):
         output = output.reshape(-1).type(torch.float)
         masks = masks.reshape(-1).type(torch.float)  # Convert masks to float
         # Compute loss
-        loss = criterion(output, massks)
+        loss = criterion(output, masks)
         # Compute metrics
         acc = binary_accuracy(output, masks, threshold=0.5)
         # Add loss & acc to list
