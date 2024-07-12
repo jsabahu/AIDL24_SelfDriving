@@ -15,25 +15,8 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.tensorboard import SummaryWriter
 from utils import save_model
 from logger import Logger
-
-"""
-# Simple Logger class implementation
-class Logger:
-    def __init__(self, log_file="training.log"):
-        self.log_file = log_file
-
-    def log_info(self, message):
-        self._log_message("[INFO]", message)
-
-    def log_debug(self, message):
-        self._log_message("[DEBUG]", message)
-
-    def _log_message(self, level, message):
-        log_message = f"{level}: {message}"
-        print(log_message)  # Print to console
-        with open(self.log_file, "a") as file:
-            file.write(log_message + "\n")  # Write to file
-"""
+import numpy as np
+import random
 
 # Initialize tensorboard writer and logger
 writer = SummaryWriter()
@@ -73,10 +56,11 @@ def create_transforms(config):
 
 
 class BDDDataset(Dataset):
-    def __init__(self, root, annotation_file, transforms=None, filter_annotations=True):
+    def __init__(self, root, annotation_file, config, transforms=None, filter_annotations=True, ):
         self.root = root
         self.transforms = transforms
         self.filter_annotations = filter_annotations
+        self.config = config
         with open(annotation_file) as f:
             self.annotations = json.load(f)
         if self.filter_annotations:
@@ -89,13 +73,10 @@ class BDDDataset(Dataset):
         valid_annotations = []
         for ann in annotations:
             if "labels" in ann and any(
-                obj["category"] == "car" for obj in ann["labels"]
+                obj["category"] == "car" or obj["category"] == "truck" for obj in ann["labels"]
             ):
                 valid_annotations.append(ann)
-            # else:
-            # logger.log_debug(
-            #    f"Skipping invalid annotation: {ann['name'] if 'name' in ann else 'unknown'}"
-            # )
+
         return valid_annotations
 
     def __len__(self):
@@ -113,20 +94,22 @@ class BDDDataset(Dataset):
             return None
 
         img = Image.open(img_path).convert("RGB")
-
+        scale_width =self.config["transforms"]["resize_width"] / img.size[0]
+        scale_heigh = self.config["transforms"]["resize_height"] / img.size[1]
         boxes = []
         labels = []
         if "labels" in ann:
             for obj in ann["labels"]:
-                if not self.filter_annotations or obj["category"] == "car":
+                if not self.filter_annotations or obj["category"] == "car" or obj["category"] == "truck":
                     x_min, y_min, x_max, y_max = (
-                        obj["box2d"]["x1"],
-                        obj["box2d"]["y1"],
-                        obj["box2d"]["x2"],
-                        obj["box2d"]["y2"],
+                        obj["box2d"]["x1"] * scale_width,
+                        obj["box2d"]["y1"] * scale_heigh,
+                        obj["box2d"]["x2"] * scale_width,
+                        obj["box2d"]["y2"] * scale_heigh,
                     )
                     boxes.append([x_min, y_min, x_max, y_max])
-                    labels.append(1)  # Car label
+                    if (obj["category"] == "car" or obj["category"]):
+                        labels.append(0)  # Car or Truck label
 
         if len(boxes) == 0:
             return None
@@ -137,10 +120,6 @@ class BDDDataset(Dataset):
 
         if self.transforms:
             img = self.transforms(img)
-
-        if torch.isnan(img).any():
-            logger.log_debug(f"NaN detected in image: {img_path}. Skipping...")
-            return None
 
         if torch.isnan(img).any():
             logger.log_debug(f"NaN detected in image: {img_path}. Skipping...")
@@ -172,11 +151,24 @@ def create_data_loader(config, dataset):
 
 
 def create_model(num_classes):
+    
+    # Function to set random seeds for reproducibility
+    def set_seed(seed):
+        torch.manual_seed(seed)
+        torch.cuda.manual_seed(seed)
+        np.random.seed(seed)
+        random.seed(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+    
+    # Set seeds for reproducibility
+    set_seed(10)
+
     # Load a pre-trained model for classification and return only the features
     model = torchvision.models.detection.fasterrcnn_resnet50_fpn(
         weights=FasterRCNN_ResNet50_FPN_Weights.COCO_V1
     )
-
+    
     # Get the number of input features for the classifier
     in_features = model.roi_heads.box_predictor.cls_score.in_features
 
@@ -185,16 +177,9 @@ def create_model(num_classes):
 
     return model
 
-
 def train_model(config, model, train_loader, val_loader, device):
     learning_rate = (
-        config["hyperparameters"]["learning_rate"] * 0.01
-    )  # Lower initial learning rate
-
-
-def train_model(config, model, train_loader, val_loader, device):
-    learning_rate = (
-        config["hyperparameters"]["learning_rate"] * 0.01
+        config["hyperparameters"]["learning_rate"]
     )  # Lower initial learning rate
     weight_decay = config["hyperparameters"]["weight_decay"]
     num_epochs = config["hyperparameters"]["num_epoch"]
@@ -212,15 +197,16 @@ def train_model(config, model, train_loader, val_loader, device):
     best_val_loss = float("inf")
     early_stopping_counter = 0
 
-    model_name = "Faster_R_CNN.pth"
+    model_name = 'Faster_R_CNN.pth'
 
     for epoch in range(num_epochs):
         model.train()
         # Load model if exists
-        model_path = os.path.join("models", model_name)
+        model_path = os.path.join('models', model_name)
         print(model_path)
         if os.path.exists(model_path):
-            model.load_state_dict(torch.load(model_path, map_location=device))
+            state_dict = torch.load(model_path, map_location=device)
+            model.load_state_dict(state_dict, strict=False)
             logger.log_debug(f"Model load from {model_path}")
         else:
             logger.log_debug("Model train started")
@@ -271,9 +257,12 @@ def train_model(config, model, train_loader, val_loader, device):
         logger.log_info(
             f"Epoch {epoch+1}/{num_epochs}, Loss: {running_loss / len(train_loader)}"
         )
+               
+        writer.add_scalar(f"Loss train", running_loss / len(train_loader), epoch)
+
         # Save model every epoch
         save_model(model, model_name)
-
+        
         # Evaluate after each epoch
         accuracy, val_loss = evaluate_model(
             model, val_loader, device, iou_threshold=0.5
@@ -281,6 +270,9 @@ def train_model(config, model, train_loader, val_loader, device):
         logger.log_info(
             f"Epoch {epoch+1}/{num_epochs}, Validation Loss: {val_loss:.4f}, Accuracy: {accuracy:.4f}"
         )
+
+        writer.add_scalar(f"Loss val", val_loss, epoch)
+        writer.add_scalar(f"Acc val", accuracy, epoch)
 
         # Adjust learning rate
         lr_scheduler.step(val_loss)
@@ -295,6 +287,7 @@ def train_model(config, model, train_loader, val_loader, device):
                 logger.log_info(f"Early stopping at epoch {epoch+1}")
                 break
 
+    writer.flush()
     torch.cuda.empty_cache()
 
 
@@ -326,9 +319,6 @@ def evaluate_model(model, data_loader, device, iou_threshold=0.5):
     correct = 0
     total = 0
     running_val_loss = 0.0
-    correct = 0
-    total = 0
-    running_val_loss = 0.0
     with torch.no_grad():
         for images, targets in data_loader:
             if len(images) == 0:  # Check if the list of images is empty
@@ -342,30 +332,23 @@ def evaluate_model(model, data_loader, device, iou_threshold=0.5):
             predictions = model(images)
 
             for target, prediction in zip(targets, predictions):
-                gt_boxes = target["boxes"].cpu()
-                pred_boxes = prediction["boxes"].cpu()
-                if len(pred_boxes) == 0:
-                    continue
+                gt_boxes = target["boxes"].to(device)
+                total += len(gt_boxes)
+                pred_boxes = prediction["boxes"].to(device)
+                val_loss = 0
 
-                val_loss = sum(
-                    [
-                        compute_iou(pred_box, gt_box)
-                        for pred_box in pred_boxes
-                        for gt_box in gt_boxes
-                    ]
-                ) / len(pred_boxes)
-                running_val_loss += val_loss
+                for gt_box in gt_boxes:
+                    iou_scores = [compute_iou(pred_box, gt_box) for pred_box in pred_boxes]
+                    if iou_scores:
+                        val_loss += max(iou_scores)
+                    else:
+                        val_loss += float("inf")
+
+                running_val_loss += val_loss / len(gt_boxes) if len(gt_boxes) > 0 else float("inf")
 
                 for pred_box in pred_boxes:
-                    iou_scores = [compute_iou(pred_box, gt_box) for gt_box in gt_boxes]
                     if max(iou_scores) > iou_threshold:
                         correct += 1
-                    total += 1
-
-                # Log details for debugging
-                # logger.log_debug(f"Ground Truth Boxes: {gt_boxes}")
-                # logger.log_debug(f"Predicted Boxes: {pred_boxes}")
-                # logger.log_debug(f"IOU Scores: {iou_scores}")
 
     accuracy = correct / total if total > 0 else 0
     val_loss = running_val_loss / len(data_loader) if len(data_loader) > 0 else 0
