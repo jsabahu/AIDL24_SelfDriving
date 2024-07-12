@@ -185,6 +185,12 @@ The Faster R-CNN model typically uses a multi-task loss function that combines s
 The total loss is a weighted sum of these components:
 L_total = λ_cls * L_cls + λ_box * L_box + λ_rpn_cls * L_rpn_cls + λ_rpn_box * L_rpn_box
 
+Where:
+- L_cls: Classification loss
+- L_box: Bounding box regression loss
+- L_rpn_cls: RPN classification loss (objectness)
+- L_rpn_box: RPN bounding box regression loss
+- λ: Balancing parameters for each loss component
 
 ## Evaluation Metrics
 
