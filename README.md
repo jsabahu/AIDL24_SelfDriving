@@ -112,6 +112,36 @@ This is the complete model that integrates all the components. It:
 - Processes them through the backbone, FPN, RoI align, and the semantic lane head
 - Produces the final lane detection mask logits
 
+## Loss Function
+
+The model uses Binary Cross-Entropy with Logits as the loss function for both training and evaluation:
+
+```python
+F.binary_cross_entropy_with_logits(output, masks)
+```
+This loss function combines a Sigmoid layer and the Binary Cross-Entropy loss in a single function. It's numerically stable and especially useful for tasks like lane detection where the output is a binary mask.
+Key Features:
+
+Automatically applies the sigmoid activation function to the model output before calculating the loss.
+Provides better numerical stability than using a plain Sigmoid followed by Binary Cross-Entropy loss.
+
+## Evaluation Metric
+The primary evaluation metric used is Binary Accuracy:
+```python
+acc = binary_accuracy(output, masks, threshold=0.5)
+```
+Binary Accuracy
+This metric calculates the accuracy of binary predictions:
+
+It applies a threshold (default 0.5) to the model's output to create binary predictions.
+It then compares these binary predictions to the ground truth masks.
+The result is the proportion of correct predictions (both true positives and true negatives) among the total number of cases examined.
+
+Key Points:
+
+Threshold: A value of 0.5 is used to convert the model's probabilistic output into binary predictions.
+Interpretation: An accuracy of 1.0 means perfect prediction, while 0.5 would be equivalent to random guessing for a balanced dataset.
+
 
 ### Faster R-CNN with ResNet50-FPN
 
