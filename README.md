@@ -242,37 +242,35 @@ Accuracy = Number of Correct Predictions / Total Number of Ground Truth Boxes
 
 ## Computational Resources
 
-This project was developed using [hardware/software details]. We utilized [specific GPUs/cloud resources] for training our models.
+### Mask R-CNN
 
-## How To Run
+- **Hardware**: Laptop
+- **Processing Unit**: Single CPU
+- **Training Duration**: 64 hours
 
-1. Clone the repository:
-   ```
-   git clone https://github.com/jsabahu/AIDL24_SelfDriving.git
-   ```
-2. Create and activate a conda environment:
-   ```
-   conda create --name AIDL24_SelfDriving python=3.11.9
-   conda activate AIDL24_SelfDriving
-   ```
-3. Install required packages:
-   ```
-   pip install -r requirements.txt
-   ```
+The Mask R-CNN model, known for its effectiveness in instance segmentation tasks, was trained on a standard laptop configuration. This setup demonstrates the model's ability to be trained on consumer-grade hardware, albeit with a significant time investment.
+
+### Lane Net
+
+- **Hardware**: Personal Computer (PC)
+- **Processing Units**: 
+  - GPU (1)
+  - CPU (1)
+
+Our custom Lane Net model leveraged both CPU and GPU processing power on a personal computer. This configuration allows for faster training times compared to CPU-only setups, making it suitable for iterative development and experimentation.
+
+### Faster R-CNN
+
+- **Platform**: Google Cloud
+- **Processing Units**:
+  - GPUs (2)
+  - CPU (1)
+
+The Faster R-CNN model was trained using cloud computing resources, specifically on Google Cloud. This high-performance setup with multiple GPUs is ideal for training complex models or working with large datasets, significantly reducing training time compared to local machine setups.
 
 ## Training Models
 
 [Provide details on how to train each model, including hyperparameters and training scripts]
-
-## Challenges
-
-### Exploding Gradients
-
-We addressed the issue of exploding gradients by [describe your solution, e.g., gradient clipping, adjusting learning rates].
-
-### Predictions Positioning
-
-To improve prediction positioning, we [describe your approach, e.g., implemented post-processing techniques, fine-tuned model architectures].
 
 ## Transfer Learning
 
