@@ -311,7 +311,7 @@ The results were good, but not as good as we expected. At this point we decided 
 
 The next step was implement both models in a real video to validate real-world performance. It was done using a mobile in a car, driving on the highway.
 
-<video controls src="report images/MaskRCNN vs LaneNET.mp4" title="Title"></video>
+<video controls src="report images/MaskRCNN vs LaneNET.gif" title="Title"></video>
 
 The LaneNet model (right side) was a lot better than the Mask R-CNN (left side), like we expected. the surprising was that both models were able to detect the lines in really bad quality video.
 
@@ -327,7 +327,7 @@ This algorithm was based in the following steps:
   - Calculate the image rotation from this point respect the previous image.
   - Apply a simple calculation: angle_new = angle_old + (2 x angle_diff) 
 
-<video controls src="report images/Self Driving.mp4" title="Title"></video>
+<video controls src="report images/Self Driving.gif" title="Title"></video>
 
 To give consistence to experiment, we applied also the algorithm to the original image (left side). The results were as we expected, better on the LaneNET predictor (right side), than in the Mask R-CNN (center). The precision of the image, helped a lot to get a good response. 
 
@@ -366,7 +366,7 @@ The final experiment was implement in the self-driving system the object detecti
 
 To decide the color, we use the lower height of the box predicted. The results are visible in the following video.
 
-<video controls src="report images/ObjectDetection & WheelDrive v1.mp4" title="Title"></video>
+<video controls src="report images/ObjectDetection & WheelDrive v1.gif" title="Title"></video>
 
 The experiment was a success.
 
