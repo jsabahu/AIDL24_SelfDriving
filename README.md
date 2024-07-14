@@ -280,19 +280,94 @@ Transfer learning is a machine learning method where a model developed for a tas
 
 ### Application of Transfer Learning in This Project
 
-We applied transfer learning to [describe which models and how it was applied].
+The aim of our experiment was to check with a line detection model and an object detection model on a simple camera, we were able to predict on the road the direction that a self-driving system should follow, with proximity indicators of other vehicles.
 
 ### Transfer Learning Code
 
-[Provide code snippets or explanations of how transfer learning was implemented]
+To achieve this goal we decided to implement from scratch a LaneNET model and Mask R-CNN model, compare the results and apply the best one.
+
+In addition we tried to implement a Faster R-CNN for object detection, to indicate other vehicles proximity.
 
 ## Models Comparison
 
-[Present a detailed comparison of the performance of LaneNet, MaskRCNN, and FasterRCNN, including metrics and analysis]
+The first goal was get the lines detection, using two different sizes of image on the Mask R-CNN model devellopped from scratch (180x320 vs 480x854). The model was giving a small output of fixed dimension, causing that recover the original image size was only possible using the 180x320 size input.
+We stop the trials due to the long train process (at this point we were training using a laptop with CPU).
+
+The results using a google maps image as reference were as follows:
+
+Mask R-CNN
+![alt text](<report images/MaskRCNN.png>)
+
+At the same type we were preparing the second model LaneNET to get a different performance. In this case we train the model focus on images of 480x854, expecting get a better precision. The model was get from a paper but using a different dataset (smaller in fact).
+
+![alt text](<report images/LaneNET v0.png>)
+
+The results were good, but not as good as we expected. At this point we decided adapt the bdd100k Dataset to the model to train it with a lot more samples. The result was surprising, a lot more of precision, just detecting the road lines.
+
+![alt text](<report images/LaneNET v1.png>)
 
 ## Validation With Our Own Images
 
-We tested our models on a set of custom images to validate real-world performance. [Describe the results and provide examples]
+The next step was implement both models in a real video to validate real-world performance. It was done using a mobile in a car, driving on the highway.
+
+<video controls src="report images/MaskRCNN vs LaneNET.mp4" title="Title"></video>
+
+The LaneNet model (right side) was a lot better than the Mask R-CNN (left side), like we expected. the surprising was that both models were able to detect the lines in really bad quality video.
+
+To achieve our goal we had some troubles like:
+  - The images size applied to model had to match with the trained images side to get good results.
+  - The images focus had to be consistent with train dataset (landscape vs road).
+  - Difficult define the threshold to decide if it is point or not, it depends a lot of the image quality and resolution.
+
+Once developed the line detection models, we create a simple algorithm to calculate the angle deviation from previous to current frame on a video, and we applied an addition calculation to rotate a possible wheeldrive. We tried to simulate a possible self-driving system.
+
+This algorithm was based in the following steps:
+  - Find the center of the binary mask image.
+  - Calculate the image rotation from this point respect the previous image.
+  - Apply a simple calculation: angle_new = angle_old + (2 x angle_diff) 
+
+<video controls src="report images/Self Driving.mp4" title="Title"></video>
+
+To give consistence to experiment, we applied also the algorithm to the original image (left side). The results were as we expected, better on the LaneNET predictor (right side), than in the Mask R-CNN (center). The precision of the image, helped a lot to get a good response. 
+
+The last experiment was add a object detection to our system. We implent a Faster R-CNN from ResNet50 and what had to be simple caused as many troubles. We used a annotations from the same dataset bdd100k.
+
+The training of this model required a lot of performance, so required to use a Google Cloud with GPU. We train for first time using 20000 images with 30 epochs, just looking for cars. The results were not like expected, were bad and not repetitive.
+
+![alt text](<report images/FasterRCNN v0.png>)
+
+The train and validate loss didn’t go according, accuracy really bad and overfitting.
+
+![alt text](<report images/FasterRCNN Train v0.png>)
+
+We increase the number of samples using less epochs and fixed the seed to be more deterministic. Also we include in out annotations the trucks.
+
+The next train was also done using a GPU on Google Cloud, with 70000 samples and only 4 epochs, but the results still bad. 
+
+![alt text](<report images/FasterRCNN v1.png>)
+
+Train and validation loss graphs didn't go according and accuraccy was really bad.
+
+![alt text](<report images/FasterRCNN Train v1.png>)
+
+Found that annotations were not properly scaled according to the image resize transform, so we tried to fix it and train it again, bu we expend the rest of Google Cloud balance we had.
+We couldn’t finish the tranning (we tried using local CPU but was too long), so we decided implement the pre-trained model.
+
+The results were satisfactory.
+
+![alt text](<report images/FasterRCNN v2.png>)
+
+The final experiment was implement in the self-driving system the object detection and show the proximity of a car by colors:
+
+  - green, the vehicle was far
+  - yellow, the vehicle was close
+  - red, the vehicle was too close
+
+To decide the color, we use the lower height of the box predicted. The results are visible in the following video.
+
+<video controls src="report images/ObjectDetection & WheelDrive v1.mp4" title="Title"></video>
+
+The experiment was a success.
 
 ## Conclusion And Future Work
 
