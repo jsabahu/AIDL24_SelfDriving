@@ -264,9 +264,10 @@ Our custom Lane Net model leveraged both CPU and GPU processing power on a perso
 - **Platform**: Google Cloud
 - **Processing Units**:
   - GPUs (2)
-  - CPU (1)
+  - CPU (4)
 
 The Faster R-CNN model was trained using cloud computing resources, specifically on Google Cloud. This high-performance setup with multiple GPUs is ideal for training complex models or working with large datasets, significantly reducing training time compared to local machine setups.
+This model has been trained using 4 CPUs because we have a configuration with 4 workers in common. If we use fewer CPUs, the model's performance may degrade significantly, leading to potential bottlenecks and inefficiencies.
 
 ## Training Models
 
