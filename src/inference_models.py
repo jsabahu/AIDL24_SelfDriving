@@ -3,6 +3,7 @@ from torchvision.models.detection import (
     fasterrcnn_resnet50_fpn_v2,
     FasterRCNN_ResNet50_FPN_V2_Weights,
 )
+import torch.nn.functional as F
 from torchvision.utils import draw_bounding_boxes
 from torchvision.transforms.functional import to_pil_image
 
@@ -161,69 +162,37 @@ def inference_LaneNet(img):
 
 def inference_LaneDetectionModel(img):
     # Initialize the LaneDetectionModel
-    model_path = "models/lane_detection_model.pth"
-    model = LaneDetectionModel()
-    model.load_state_dict(
-        torch.load(
-            model_path,
-            map_location=torch.device(
-                "cpu" if not torch.cuda.is_available() else "cuda"
-            ),
-        )
-    )
-    model.eval()
-    model.to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+    model_path = "models/train_mask_rCNN.pth"
+    # Device configuration
+    DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    # Convert torch tensor to PIL Image
-    img_pil = to_pil_image(img)
+    target_size1 = (180, 320)
 
-    # Transform the image
-    resize_height = int(config["main"]["resize_height"])
-    resize_width = int(config["main"]["resize_width"])
+    # Prepare Mask R-CNN model
+    model1 = LaneDetectionModel().to(DEVICE)
+    model1.load_state_dict(torch.load(model_path, map_location=DEVICE))
+    model1.eval()
 
-    data_transform = transforms.Compose(
-        [
-            transforms.Resize((resize_height, resize_width)),
-            transforms.ToTensor(),
-            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
-        ]
-    )
-    img_transformed = data_transform(img_pil).to(model.device)
-    img_transformed = torch.unsqueeze(img_transformed, dim=0)
-
-    # Generate full image ROIs
-    rois = generate_full_image_rois(
-        batch_size=1, target_size=(resize_height, resize_width)
+    # Transform for Mask R-CNN
+    transform1 = transforms.Compose(
+        [transforms.ToTensor(), transforms.Resize(target_size1, antialias=True)]
     )
 
-    # Perform inference
+    if isinstance(img, torch.Tensor):
+        image1 = img.to(torch.float32).unsqueeze(0).to(DEVICE)
+    else:
+        image1 = transform1(img).unsqueeze(0).to(DEVICE)
+
     with torch.no_grad():
-        mask_logits = model(img_transformed, rois)
+        output1 = model1(image1, generate_full_image_rois(1, target_size1, 0))
+        output1 = F.interpolate(
+            output1, size=target_size1, mode="bilinear", align_corners=False
+        )
+        output1 = (output1 - output1.min()) / (output1.max() - output1.min())
+        output1 = (output1 > 0.01).type(torch.int)
+        output1_np = output1.detach().cpu().numpy()[0, 0]  # Squeeze the last dimension
 
-    # Get the binary mask from the logits
-    binary_mask = torch.sigmoid(mask_logits).squeeze().cpu().numpy() > 0.5
-    binary_mask = binary_mask.astype(np.uint8) * 255
-
-    # Apply a colormap only to the white pixels of the binary mask
-    colored_mask = cv2.applyColorMap(binary_mask, cv2.COLORMAP_AUTUMN)
-
-    # Create a mask where the binary mask is white
-    white_mask = binary_mask == 255
-
-    # Apply the white mask to the colored mask
-    masked_colored_mask = np.zeros_like(colored_mask)
-    masked_colored_mask[white_mask] = colored_mask[white_mask]
-
-    # Convert the original image to a numpy array
-    input_img = np.array(img_pil.resize((binary_mask.shape[1], binary_mask.shape[0])))
-
-    # Blend the original image and the masked colored mask
-    blended_image = cv2.addWeighted(input_img, 0.7, masked_colored_mask, 0.3, 0)
-
-    # Convert to PIL image for consistent output format
-    blended_image_pil = Image.fromarray(blended_image)
-
-    return blended_image_pil
+    return output1_np
 
 
 def inference_MaskRCNN(img):
@@ -239,15 +208,60 @@ def inference_MaskRCNN(img):
     batch = preprocess(img).unsqueeze(0)
 
     # Step 4: Use the model and visualize the prediction
-    prediction = model(batch)["out"]
-    normalized_masks = prediction.softmax(dim=1)
-    class_to_idx = {cls: idx for (idx, cls) in enumerate(weights.meta["categories"])}
-    mask = normalized_masks[0, class_to_idx["dog"]]
-    return to_pil_image(mask)
+    with torch.no_grad():
+        predictions = model(batch)
+
+    # Step 5: Extract the masks and visualize
+    masks = predictions[0]["masks"]
+    labels = predictions[0]["labels"]
+
+    # Categories of interest
+    categories_of_interest = [
+        "car",
+        "motorcycle",
+        "bus",
+        "truck",
+        "traffic light",
+    ]
+
+    # Find the masks corresponding to the specified categories
+    combined_masks = torch.zeros_like(masks[0, 0])
+    for i, label in enumerate(labels):
+        category = weights.meta["categories"][label.item()]
+        if category in categories_of_interest:
+            combined_masks = torch.max(combined_masks, masks[i, 0])
+
+    # Convert the mask to a binary mask
+    binary_mask = (combined_masks > 0.5).byte().cpu().numpy() * 255
+
+    # Apply a colormap only to the white pixels of the binary mask
+    colored_mask = cv2.applyColorMap(binary_mask, cv2.COLORMAP_AUTUMN)
+
+    # Create a mask where the binary mask is white
+    white_mask = binary_mask == 255
+
+    # Apply the white mask to the colored mask
+    masked_colored_mask = np.zeros_like(colored_mask)
+    masked_colored_mask[white_mask] = colored_mask[white_mask]
+
+    # Convert the original image to a numpy array
+    input_img = np.array(to_pil_image(img))
+
+    # Resize the masked colored mask to match the original image size
+    masked_colored_mask = cv2.resize(
+        masked_colored_mask, (input_img.shape[1], input_img.shape[0])
+    )
+
+    # Blend the original image and the masked colored mask
+    blended_image = cv2.addWeighted(input_img, 0.7, masked_colored_mask, 0.3, 0)
+
+    # Convert to PIL image for consistent output format
+    blended_image_pil = Image.fromarray(blended_image)
+
+    return blended_image_pil
 
 
 if __name__ == "__main__":
-
-    img = read_image("data/bdd100ktrans/images/100k/train/b029772f-adbf0e39.jpg")
+    img = read_image("data/bdd100ktrans/images/100k/train/fe16aa77-810c2e1f.jpg")
     im = inference_MaskRCNN(img)
     im.show()
