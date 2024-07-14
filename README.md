@@ -299,11 +299,11 @@ The results using a google maps image as reference were as follows:
 Mask R-CNN
 ![alt text](<report images/MaskRCNN.png>)
 
-At the same type we were preparing the second model LaneNET to get a different performance. In this case we train the model focus on images of 480x854, expecting get a better precision. The model was get from a paper but using a different dataset (smaller in fact).
+At the same time we were preparing the second model LaneNET to get a different performance. In this case we train the model focus on images of 480x854, expecting get a better precision. The model was get from a paper but using a different dataset (smaller in fact).
 
 ![alt text](<report images/LaneNET v0.png>)
 
-The results were good, but not as good as we expected. At this point we decided adapt the bdd100k Dataset to the model to train it with a lot more samples. The result was surprising, a lot more of precision, just detecting the road lines.
+The results were good, but not as good as we expected. At this point we decided adapt the bdd100k dataset to the model to train it with a lot more samples. The result was surprising, a lot more of precision, just detecting the road lines.
 
 ![alt text](<report images/LaneNET v1.png>)
 
@@ -316,11 +316,11 @@ The next step was implement both models in a real video to validate real-world p
 The LaneNet model (right side) was a lot better than the Mask R-CNN (left side), like we expected. the surprising was that both models were able to detect the lines in really bad quality video.
 
 To achieve our goal we had some troubles like:
-  - The images size applied to model had to match with the trained images side to get good results.
+  - The images size applied on the model had to match with the trained images size to get good results.
   - The images focus had to be consistent with train dataset (landscape vs road).
   - Difficult define the threshold to decide if it is point or not, it depends a lot of the image quality and resolution.
 
-Once developed the line detection models, we create a simple algorithm to calculate the angle deviation from previous to current frame on a video, and we applied an addition calculation to rotate a possible wheeldrive. We tried to simulate a possible self-driving system.
+Once developed the line detection models, we create a simple algorithm to calculate the angle deviation from previous to current frame on a video, and we applied an addition calculation to rotate a possible wheeldrive. Basically, we tried to simulate a possible self-driving system.
 
 This algorithm was based in the following steps:
   - Find the center of the binary mask image.
@@ -329,11 +329,11 @@ This algorithm was based in the following steps:
 
 <video controls src="report images/Self Driving.gif" title="Title"></video>
 
-To give consistence to experiment, we applied also the algorithm to the original image (left side). The results were as we expected, better on the LaneNET predictor (right side), than in the Mask R-CNN (center). The precision of the image, helped a lot to get a good response. 
+To give consistence to the experiment, we applied also the algorithm to the original image (left side). The results were as we expected, better on the LaneNET predictor (right side), than in the Mask R-CNN (center). The precision of the image, helped a lot to get a good response. 
 
-The last experiment was add a object detection to our system. We implent a Faster R-CNN from ResNet50 and what had to be simple caused as many troubles. We used a annotations from the same dataset bdd100k.
+The last experiment was add an object detection to our system. We implent a Faster R-CNN from ResNet50 and what had to be simple, was complicated. We used a annotations from the same dataset bdd100k.
 
-The training of this model required a lot of performance, so required to use a Google Cloud with GPU. We train for first time using 20000 images with 30 epochs, just looking for cars. The results were not like expected, were bad and not repetitive.
+The training of this model required a lot of performance, so we started just when we get the option of train using a Google Cloud with GPU. We train for first time using 20000 images with 30 epochs, just looking for cars. The results were not like expected, were bad and not repetitive.
 
 ![alt text](<report images/FasterRCNN v0.png>)
 
@@ -372,7 +372,8 @@ The experiment was a success.
 
 ## Conclusion And Future Work
 
-Our project demonstrates [key findings]. Future work could focus on [potential improvements or new directions].
+Our project demonstrates how complicate is develop, debug and apply a model from scratch. We confirm how important is start from verified models and if it is possible pre-trained models to save time and resources for training. On the other side, we observe how from the theory, a model can be created from scratch and also works.
+A future work could focus on improve the models performance to be applied faster in real time, add new inputs additionally to a camera and develop a more sophisticated algorithms for self-driving.
 
 ## References
 
