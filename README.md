@@ -31,52 +31,65 @@
 
 Our project aims to advance the field of autonomous driving through improved computer vision techniques. We hypothesize that by integrating state-of-the-art models for lane detection and object recognition, we can enhance the accuracy and reliability of self-driving systems.
 
-## Dataset
+## 2. Dataset
 
-We use [BDD100K Dataset](https://www.vis.xyz/bdd100k/), which contains 100.000 images of diverse road scenes. This dataset is crucial for our project due to its comprehensive coverage of various driving conditions and high-quality annotations.\
-You can download the dataset from [here](https://dl.cv.ethz.ch/bdd100k/data/)
+We use [BDD100K Dataset](https://www.vis.xyz/bdd100k/), which contains 100.000 images of diverse road scenes. This dataset is crucial for our project due to its comprehensive coverage of various driving conditions and high-quality annotations. [Download](https://dl.cv.ethz.ch/bdd100k/data/)
 
-### Analysis of the Dataset
+### 2.1. Analysis of the Dataset
 
-The BDD100K dataset is a comprehensive collection of 100,000 images capturing diverse road scenes. This dataset is pivotal for projects involving autonomous driving, computer vision, and scene understanding due to its extensive coverage of various driving conditions and high-quality annotations.
+The BDD100K dataset is the largest driving video dataset with 100K videos and 10 tasks to evaluate the exciting progress of image recognition algorithms on autonomous driving. 
 
-#### 1. Overview
+#### 2.1.1. Overview
 
 * **Number of Images**: 100,000
 * **Resolution**: 1280x720 pixels
 * **Annotations**: Multiple types including object detection, lane marking, drivable area, and segmentation.
 * **Driving Conditions**: Diverse, covering different weather conditions, times of day, and various locations.
 
-#### 2. Data Types and Annotations
+#### 2.1.2 Data Types and Annotations
 * **Object Detection**: Bounding boxes for objects such as cars, pedestrians, traffic signs, and cyclists.
 * **Lane Marking**: Polylines indicating the position of lane markings on the road.
 * **Drivable Area**: Segmentation maps identifying areas that are drivable.
 * **Semantic Segmentation**: Pixel-level labels for different objects and regions in the image.
 * **Instance Segmentation**: Pixel-level labels with instance information for objects.
+## 3. Models
 
-## Models
+### 3.1. LaneNet
 
-### LaneNet
+[LaneNet](https://arxiv.org/pdf/1802.05591) is our primary model for lane detection. It is a convolutional neural network (CNN) model designed specifically for lane detection in autonomous driving applications, which is crucial for tasks such as lane keeping, lane changing, and overall vehicle navigation. It employs a segmentation-based approach to identify and classify lane markings accurately.
 
-LaneNet is our primary model for lane detection. It is a convolutional neural network (CNN) model designed specifically for lane detection in autonomous driving applications, which is crucial for tasks such as lane keeping, lane changing, and overall vehicle navigation.It employs a segmentation-based approach to identify and classify lane markings accurately.
-
-#### Architecture
-##### 1. Encoder-Decoder Structure:
+#### 3.1.1. Architecture
+##### **1. Encoder-Decoder Structure** :
 LaneNet employs an encoder-decoder architecture to process input images and generate lane detection results. The encoder extracts high-level features from the input image using a series of convolutional layers, while the decoder reconstructs the spatial details to produce pixel-wise lane markings.
 
-##### 2. Instance Segmentation:
+##### **2. Instance Segmentation**:
 LaneNet uses a semantic segmentation approach combined with instance segmentation. The model segments the image into lane and non-lane regions and differentiates between individual lane markings. This dual approach allows LaneNet to handle multiple lanes simultaneously and distinguish between them.
 
-##### 3. Embedding Learning:
+##### **3. Embedding Learning**:
 A key feature of LaneNet is its use of embedding vectors. For each pixel classified as a lane, the network assigns an embedding vector that helps cluster pixels belonging to the same lane. This clustering is achieved through a discriminative loss function that encourages pixels of the same lane to have similar embeddings while separating different lanes.
 
-### MaskRCNN
+#### 3.1.2. Our Approach
+For the LaneNet model, we use the ENet backbone. We train with the complete model, but for inference, we use only the head of the binary mask. The instance mask is not used to infer the final image.
+
+#### 3.1.3. Loss Functions
+
+LaneNet employs two primary loss functions:
+
+* **Binary Cross-Entropy Loss**: Used in the segmentation branch to classify each pixel as lane or background. This loss helps the model learn to distinguish lane markings from the rest of the image.
+* **Discriminative Loss**: Applied in the embedding branch to ensure that pixels belonging to the same lane are close together in the embedding space while being distinct from other lanes. It consists of three components:
+    - **Variance Loss**: Encourages embeddings within the same lane to be close to their mean.
+    - **Distance Loss**: Ensures that the means of different lanes are far apart.
+    - **Regularization Loss**: Aims to keep the embeddings small to avoid large values.
+By combining these loss functions, LaneNet can accurately segment lanes and differentiate between multiple lane markings, providing robust lane detection capabilities for autonomous driving applications.
+
+
+### 3.2. MaskRCNN
 
 This model is designed to perform lane detection using a combination of convolutional neural network (CNN) layers, feature pyramid networks (FPN), region of interest (RoI) alignment, and semantic segmentation heads.
 
-#### Components
+#### 3.2.1. Components
 
-##### CustomBackbone
+##### **1. CustomBackbone**
 
 This component is a convolutional neural network that extracts feature maps from input images. It uses:
 - Several convolutional layers
@@ -85,34 +98,34 @@ This component is a convolutional neural network that extracts feature maps from
 
 The feature maps are extracted through a series of layers.
 
-##### FeaturePyramidNetwork
+##### **2. FeaturePyramidNetwork**
 
 The FPN creates feature pyramids from the backbone's output. It:
 - Combines feature maps from different levels (layers)
 - Builds multi-scale feature maps
 - Useful for detecting objects at various scales
 
-##### PyramidRoIAlign
+##### **3. PyramidRoIAlign**
 
 This module aligns Regions of Interest (RoIs) of different sizes to a fixed size using feature maps from the FPN. It:
 - Uses the spatial scale of the feature maps to properly resize and align the RoIs
 - Distributes RoIs to different levels of the pyramid based on their size
 
-##### SemanticLaneHead
+##### **4. SemanticLaneHead**
 
 This head performs semantic segmentation for lane detection. It consists of:
 - Multiple convolutional layers
 - A deconvolutional (upsampling) layer
 - A final convolutional layer to produce the segmentation mask logits
 
-##### LaneDetectionModel
+##### **5. LaneDetectionModel**
 
 This is the complete model that integrates all the components. It:
 - Takes images and RoIs as input
 - Processes them through the backbone, FPN, RoI align, and the semantic lane head
 - Produces the final lane detection mask logits
 
-## Loss Function
+#### 3.2.2. Loss Function
 
 The model uses Binary Cross-Entropy with Logits as the loss function for both training and evaluation:
 
@@ -120,46 +133,42 @@ The model uses Binary Cross-Entropy with Logits as the loss function for both tr
 F.binary_cross_entropy_with_logits(output, masks)
 ```
 This loss function combines a Sigmoid layer and the Binary Cross-Entropy loss in a single function. It's numerically stable and especially useful for tasks like lane detection where the output is a binary mask.
-Key Features:
 
+**Key Features**:\
 Automatically applies the sigmoid activation function to the model output before calculating the loss.
 Provides better numerical stability than using a plain Sigmoid followed by Binary Cross-Entropy loss.
 
-## Evaluation Metric
+#### 3.2.3. Evaluation Metric
 The primary evaluation metric used is Binary Accuracy:
 ```python
 acc = binary_accuracy(output, masks, threshold=0.5)
 ```
-Binary Accuracy
-This metric calculates the accuracy of binary predictions:
+##### **Binary Accuracy**
+This metric computes the accuracy of binary predictions:\
+It applies a threshold (default 0.5) to the model's output to create binary predictions. It then compares these binary predictions to the ground truth masks. The result is the proportion of correct predictions (both true positives and true negatives) among the total number of cases examined.
 
-It applies a threshold (default 0.5) to the model's output to create binary predictions.
-It then compares these binary predictions to the ground truth masks.
-The result is the proportion of correct predictions (both true positives and true negatives) among the total number of cases examined.
+**Key Points**:
 
-Key Points:
+- **Threshold**: A value of 0.5 is used to convert the model's probabilistic output into binary predictions.
+- **Interpretation**: An accuracy of 1.0 means perfect prediction, while 0.5 would be equivalent to random guessing for a balanced dataset.
 
-Threshold: A value of 0.5 is used to convert the model's probabilistic output into binary predictions.
-Interpretation: An accuracy of 1.0 means perfect prediction, while 0.5 would be equivalent to random guessing for a balanced dataset.
+### 3.3. Faster R-CNN with ResNet50-FPN
 
-
-### Faster R-CNN with ResNet50-FPN
-
-## Faster R-CNN Architecture
+#### 3.3.1. Architecture
 
 Faster R-CNN is a two-stage object detection algorithm:
 
-### Region Proposal Network (RPN)
+##### **1. Region Proposal Network (RPN)**
 - Scans the image and proposes potential object regions
 - Uses anchor boxes of various sizes and aspect ratios
 - Outputs "objectness" scores and rough bounding box coordinates
 
-### Fast R-CNN
+##### **2. Fast R-CNN**
 - Takes proposed regions from RPN
 - Performs classification (what object is it?)
 - Refines bounding box coordinates
 
-## ResNet50 Backbone
+#### 3.3.2. ResNet50 Backbone
 
 ResNet50 is a deep convolutional neural network with 50 layers:
 
@@ -170,7 +179,7 @@ ResNet50 is a deep convolutional neural network with 50 layers:
   - Batch normalization
   - ReLU activation functions
 
-## Feature Pyramid Network (FPN)
+#### 3.3.3. Feature Pyramid Network (FPN)
 
 FPN enhances feature extraction:
 
@@ -179,7 +188,7 @@ FPN enhances feature extraction:
 - Lateral connections: Merges features from the bottom-up and top-down pathways
 - Helps detect objects across a wide range of scales
 
-## Pre-trained Weights (COCO_V1)
+#### 3.3.4. Pre-trained Weights (COCO_V1)
 
 - COCO (Common Objects in Context) dataset:
   - 330K images
@@ -187,33 +196,35 @@ FPN enhances feature extraction:
   - 80 object categories
 - Pre-training on COCO provides a strong starting point for transfer learning
 
-## Loss Functions
+#### 3.3.5. Loss Functions
 
 The Faster R-CNN model typically uses a multi-task loss function that combines several components:
 
-## 1. Classification Loss
+**1. Classification Loss**
 
 - Type: Cross-Entropy Loss
 - Purpose: Measures the error in classifying the object (e.g., car or truck)
 - Applied to: Both the Region Proposal Network (RPN) and the final classifier
 
-## 2. Bounding Box Regression Loss
+**2. Bounding Box Regression Loss**
 
 - Type: Smooth L1 Loss (also known as Huber Loss)
 - Purpose: Measures the error in predicting the bounding box coordinates
 - Applied to: Both the RPN and the final regressor
 - Advantage: Less sensitive to outliers compared to standard L2 loss
 
-## 3. Objectness Loss
+**3. Objectness Loss**
 
 - Type: Binary Cross-Entropy Loss
 - Purpose: Measures the error in predicting whether a region contains an object or not
 - Applied to: RPN
 
-## Combined Loss Function
-
+#### 3.3.6. Combined Loss Function
 The total loss is a weighted sum of these components:
-L_total = λ_cls * L_cls + λ_box * L_box + λ_rpn_cls * L_rpn_cls + λ_rpn_box * L_rpn_box
+
+```math
+Ltotal​=λcls​⋅Lcls​+λbox​⋅Lbox​+λrpn\_cls​⋅Lrpn\_cls​+λrpn\_box​⋅Lrpn\_box​
+```
 
 Where:
 - L_cls: Classification loss
@@ -222,15 +233,14 @@ Where:
 - L_rpn_box: RPN bounding box regression loss
 - λ: Balancing parameters for each loss component
 
-## Evaluation Metrics
+#### 3.3.7 Evaluation Metrics
 
 The code uses two primary metrics for evaluation: Accuracy and Validation Loss. These are calculated in the `evaluate_model` function.
 
-## 1. Accuracy
-
+##### **Accuracy**
 The accuracy metric in this implementation is based on the Intersection over Union (IoU) between predicted and ground truth bounding boxes.
 
-### Calculation Process:
+##### **Calculation Process:**
 1. For each image in the validation set:
    - Compare each ground truth box with all predicted boxes
    - Calculate IoU for each pair
