@@ -389,29 +389,12 @@ The experiment was a success.
 Our project demonstrates how complicate is develop, debug and apply a model from scratch. We confirm how important is start from verified models and if it is possible pre-trained models to save time and resources for training. On the other side, we observe how from the theory, a model can be created from scratch and also works.
 A future work could focus on improve the models performance to be applied faster in real time, add new inputs additionally to a camera and develop a more sophisticated algorithms for self-driving.
 
-## References
-
-1. [Reference 1]
-2. [Reference 2]
-3. ...
-
-## Contributors
-
-- Jordi Sabatés
-- Marc Ramon
-- Marc Giné
-- Fermin Gomila
-
-Advisor: Daniel Fojo
-```
-
-## Project installation
+## 2. How to run
 
 - Clone repository
 ```
 git clone https://github.com/jsabahu/AIDL24_SelfDriving.git
 ```
-
 - Create a conda environment
 ```
  conda create --name AIDL24_SelfDriving python=3.11.9
@@ -426,3 +409,25 @@ git clone https://github.com/jsabahu/AIDL24_SelfDriving.git
 ```
 pip install -r requirements.txt
 ```
+
+## References
+
+1. [LaneNet: Real-Time Lane Detection Networks for Autonomous Driving](https://arxiv.org/pdf/1807.01726)
+2. [Towards End-to-End Lane Detection: an Instance Segmentation Approach](https://arxiv.org/pdf/1802.05591)
+3. [LaneNet Lane Detection with Pytorch](https://github.com/IrohXu/lanenet-lane-detection-pytorch)
+4. [Faster R-CNN: Towards Real-Time Object Detection with Region Proposal Networks](https://arxiv.org/pdf/1506.01497)
+5. [Mask R-CNN](https://arxiv.org/pdf/1703.06870)
+6. [BDD100K Dataset: A Diverse Driving Video Dataset with Scalable Annotation Tooling](https://www.vis.xyz/bdd100k/)
+7. [ENet: A Deep Neural Network Architecture for Real-Time Semantic Segmentation](https://arxiv.org/pdf/1606.02147)
+8. [Instance Segmentation by Jointly Optimizing Spatial Embeddings and Clustering Bandwidth](https://arxiv.org/pdf/1905.01209)
+9. [Feature Pyramid Networks for Object Detection](https://arxiv.org/pdf/1612.03144)
+10. [ImageNet Large Scale Visual Recognition Challenge](https://arxiv.org/pdf/1409.0575)
+
+## Contributors
+
+- [Jordi Sabates](https://www.github.com/jsabahu)
+- Marc Ramon
+- Marc Giné
+- Fermin Gomila
+
+Advisor: Daniel Fojo
