@@ -3,9 +3,6 @@
 
 """
 generate bdd100k training dataset masks
-
-Change by OpenAI
-
 Dataset: https://bdd-data.berkeley.edu
 
 """
