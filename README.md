@@ -52,6 +52,15 @@ The BDD100K dataset is the largest driving video dataset with 100K videos and 10
 * **Drivable Area**: Segmentation maps identifying areas that are drivable.
 * **Semantic Segmentation**: Pixel-level labels for different objects and regions in the image.
 * **Instance Segmentation**: Pixel-level labels with instance information for objects.
+
+### 2.1.3 Data Transformation
+In order to train the LaneNet model with the BDD100K dataset, we have to previously transform it with the same transformation that the LaneNet model uses to be trained with the Original dataset, tuSimple.
+```
+- src/preprocessing/bdd100k_transform.py
+```
+The provided codeis used to generate training dataset masks for the BDD100K dataset, specifically for lane detection. It processes the dataset annotations and creates binary and instance masks for each image. The masks are used to train models for tasks such as semantic segmentation and lane detection in autonomous driving applications.\
+
+
 ## 3. Models
 
 ### 3.1. LaneNet
@@ -408,6 +417,14 @@ git clone https://github.com/jsabahu/AIDL24_SelfDriving.git
 - Install requirements packages
 ```
 pip install -r requirements.txt
+```
+- Download Dataset
+```
+https://dl.cv.ethz.ch/bdd100k/data/
+```
+- Transform data
+```bash
+python bdd100k_transform.py --src_dir path/to/bdd100k --val True --test True
 ```
 
 ## References
