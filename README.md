@@ -307,25 +307,25 @@ The first goal was get the lines detection, using two different sizes of image o
 We stop the trials due to the long train process (at this point we were training using a laptop with CPU).\
 The results using a google maps image as reference were as follows:
 
-![MaskRCNN Results](<report images/MaskRCNN.png>)
+![MaskRCNN Results](<results/MaskRCNN.png>)
 *Figure1: MaskRCNN*
 
 ### 7.2 LaneNET
 At the same time we were preparing the second model LaneNET to get a different performance. In this case we train the model focus on images of 480x854, expecting get a better precision. The model was get from the original paper and also using the original dataset (tuSimpleDataset).
 
-![alt text](<report images/LaneNET v0.png>)
+![alt text](<results/LaneNET v0.png>)
 *Figure2: LaneNET trained with tuSimpleDataset*
 
 The results were good, but not as good as we expected. At this point we decided adapt the bdd100k Dataset to the model to train it with a lot more samples. The result was surprising, a lot more of precision, just detecting the road lines.
 
-![alt text](<report images/LaneNET v1.png>)
+![alt text](<results/LaneNET v1.png>)
 *Figure3: LaneNET trained with bdd100k dataset*
 
 ## Validation With Our Own Images
 
 The next step was implement both models in a real video to validate real-world performance. It was done using a mobile in a car, driving on the highway.
 
-<video controls src="report images/MaskRCNN vs LaneNET.gif" title="Title"></video>
+<video src="results/MaskRCNN vs LaneNET.gif" title="Title"></video>
 
 The LaneNet model (right side) was a lot better than the Mask R-CNN (left side), like we expected. the surprising was that both models were able to detect the lines in really bad quality video.
 
@@ -341,7 +341,7 @@ This algorithm was based in the following steps:
   - Calculate the image rotation from this point respect the previous image.
   - Apply a simple calculation: angle_new = angle_old + (2 x angle_diff) 
 
-<video controls src="report images/Self Driving.gif" title="Title"></video>
+<video src="results/Self Driving.gif" title="Title"></video>
 
 To give consistence to the experiment, we applied also the algorithm to the original image (left side). The results were as we expected, better on the LaneNET predictor (right side), than in the Mask R-CNN (center). The precision of the image, helped a lot to get a good response. 
 
@@ -349,28 +349,28 @@ The last experiment was add an object detection to our system. We implent a Fast
 
 The training of this model required a lot of performance, so we started just when we get the option of train using a Google Cloud with GPU. We train for first time using 20000 images with 30 epochs, just looking for cars. The results were not like expected, were bad and not repetitive.
 
-![alt text](<report images/FasterRCNN v0.png>)
+![alt text](<results/FasterRCNN v0.png>)
 
 The train and validate loss didn’t go according, accuracy really bad and overfitting.
 
-![alt text](<report images/FasterRCNN Train v0.png>)
+![alt text](<results/FasterRCNN Train v0.png>)
 
 We increase the number of samples using less epochs and fixed the seed to be more deterministic. Also we include in out annotations the trucks.
 
 The next train was also done using a GPU on Google Cloud, with 70000 samples and only 4 epochs, but the results still bad. 
 
-![alt text](<report images/FasterRCNN v1.png>)
+![alt text](<results/FasterRCNN v1.png>)
 
 Train and validation loss graphs didn't go according and accuraccy was really bad.
 
-![alt text](<report images/FasterRCNN Train v1.png>)
+![alt text](<results/FasterRCNN Train v1.png>)
 
 Found that annotations were not properly scaled according to the image resize transform, so we tried to fix it and train it again, bu we expend the rest of Google Cloud balance we had.
 We couldn’t finish the tranning (we tried using local CPU but was too long), so we decided implement the pre-trained model.
 
 The results were satisfactory.
 
-![alt text](<report images/FasterRCNN v2.png>)
+![alt text](<results/FasterRCNN v2.png>)
 
 The final experiment was implement in the self-driving system the object detection and show the proximity of a car by colors:
 
@@ -380,7 +380,7 @@ The final experiment was implement in the self-driving system the object detecti
 
 To decide the color, we use the lower height of the box predicted. The results are visible in the following video.
 
-<video controls src="report images/ObjectDetection & WheelDrive v1.gif" title="Title"></video>
+<video src="results/ObjectDetection & WheelDrive v1.gif" title="Title"></video>
 
 The experiment was a success.
 
