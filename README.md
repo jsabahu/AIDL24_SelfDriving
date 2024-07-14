@@ -250,9 +250,19 @@ The accuracy metric in this implementation is based on the Intersection over Uni
 Accuracy = Number of Correct Predictions / Total Number of Ground Truth Boxes
 
 
-## Computational Resources
+## 4. Computational Resources
 
-### Mask R-CNN
+### 4.1. Lane Net
+
+- **Hardware**: Personal Computer (PC)
+- **Processing Units**:
+  - GPU (1): NVIDIA GeForce RTX 3080 
+  - CPU (1): Intel® Core™ i9-12900K
+- **Training Duration**: 87 hours 
+
+Our custom Lane Net model leveraged both CPU and GPU processing power on a personal computer. This configuration allows for faster training times compared to CPU-only setups, making it suitable for iterative development and experimentation.
+
+### 4.2. Mask R-CNN
 
 - **Hardware**: Laptop
 - **Processing Unit**: Single CPU
@@ -260,16 +270,7 @@ Accuracy = Number of Correct Predictions / Total Number of Ground Truth Boxes
 
 The Mask R-CNN model, known for its effectiveness in instance segmentation tasks, was trained on a standard laptop configuration. This setup demonstrates the model's ability to be trained on consumer-grade hardware, albeit with a significant time investment.
 
-### Lane Net
-
-- **Hardware**: Personal Computer (PC)
-- **Processing Units**: 
-  - GPU (1)
-  - CPU (1)
-
-Our custom Lane Net model leveraged both CPU and GPU processing power on a personal computer. This configuration allows for faster training times compared to CPU-only setups, making it suitable for iterative development and experimentation.
-
-### Faster R-CNN
+### 4.3. Faster R-CNN
 
 - **Platform**: Google Cloud
 - **Processing Units**:
@@ -279,43 +280,46 @@ Our custom Lane Net model leveraged both CPU and GPU processing power on a perso
 The Faster R-CNN model was trained using cloud computing resources, specifically on Google Cloud. This high-performance setup with multiple GPUs is ideal for training complex models or working with large datasets, significantly reducing training time compared to local machine setups.
 This model has been trained using 4 CPUs because we have a configuration with 4 workers in common. If we use fewer CPUs, the model's performance may degrade significantly, leading to potential bottlenecks and inefficiencies.
 
-## Training Models
+## 5. Training
 
 [Provide details on how to train each model, including hyperparameters and training scripts]
 
-## Transfer Learning
 
-### Introduction To Transfer Learning
+## 6. Transfer Learning
+### 6.1 Introduction To Transfer Learning
 
 Transfer learning is a machine learning method where a model developed for a task is reused as the starting point for a model on a second task.
 
-### Application of Transfer Learning in This Project
+### 6.2 Application of Transfer Learning in This Project
 
 The aim of our experiment was to check with a line detection model and an object detection model on a simple camera, we were able to predict on the road the direction that a self-driving system should follow, with proximity indicators of other vehicles.
 
-### Transfer Learning Code
+### 6.3 Transfer Learning Code
 
 To achieve this goal we decided to implement from scratch a LaneNET model and Mask R-CNN model, compare the results and apply the best one.
 
 In addition we tried to implement a Faster R-CNN for object detection, to indicate other vehicles proximity.
 
-## Models Comparison
+## 7. Models Comparison
+### 7.1 MaskRCNN
 
 The first goal was get the lines detection, using two different sizes of image on the Mask R-CNN model devellopped from scratch (180x320 vs 480x854). The model was giving a small output of fixed dimension, causing that recover the original image size was only possible using the 180x320 size input.
-We stop the trials due to the long train process (at this point we were training using a laptop with CPU).
-
+We stop the trials due to the long train process (at this point we were training using a laptop with CPU).\
 The results using a google maps image as reference were as follows:
 
-Mask R-CNN
-![alt text](<report images/MaskRCNN.png>)
+![MaskRCNN Results](<report images/MaskRCNN.png>)
+*Figure1: MaskRCNN*
 
-At the same time we were preparing the second model LaneNET to get a different performance. In this case we train the model focus on images of 480x854, expecting get a better precision. The model was get from a paper but using a different dataset (smaller in fact).
+### 7.2 LaneNET
+At the same time we were preparing the second model LaneNET to get a different performance. In this case we train the model focus on images of 480x854, expecting get a better precision. The model was get from the original paper and also using the original dataset (tuSimpleDataset).
 
 ![alt text](<report images/LaneNET v0.png>)
+*Figure2: LaneNET trained with tuSimpleDataset*
 
-The results were good, but not as good as we expected. At this point we decided adapt the bdd100k dataset to the model to train it with a lot more samples. The result was surprising, a lot more of precision, just detecting the road lines.
+The results were good, but not as good as we expected. At this point we decided adapt the bdd100k Dataset to the model to train it with a lot more samples. The result was surprising, a lot more of precision, just detecting the road lines.
 
 ![alt text](<report images/LaneNET v1.png>)
+*Figure3: LaneNET trained with bdd100k dataset*
 
 ## Validation With Our Own Images
 
