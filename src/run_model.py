@@ -9,12 +9,9 @@ from utils import read_yaml
 from models.model_ENet import ENet
 from torchvision import transforms
 from torchviz import make_dot
-import os
-import torch
 from models.LaneNet.LaneNet import LaneNet
 from torchvision import transforms
 import numpy as np
-from PIL import Image
 import cv2
 
 
@@ -32,11 +29,17 @@ except Exception as e:
 
 class LaneNetEvaluator:
     def __init__(
-        self, model_path, device="cuda" if torch.cuda.is_available() else "cpu"
+        self,
+        model_path,
+        checkpoint,
+        device="cuda" if torch.cuda.is_available() else "cpu",
     ):
         self.device = torch.device(device)
         self.model = LaneNet()
-        self.model.load_state_dict(torch.load(model_path))
+        if model_path == "" and checkpoint:
+            self.model.load_state_dict(checkpoint["model_state_dict"])
+        else:
+            self.model.load_state_dict(torch.load(model_path))
         self.model.eval()
         self.model.to(self.device)
 
@@ -49,7 +52,8 @@ class LaneNetEvaluator:
         if os.path.exists("test_output") == False:
             os.mkdir("test_output")
 
-        test_image_folder = config["dataset"]["tusimple"]["test"]["images_path"]
+        test_image_folder = "data/selfmade"
+        # test_image_folder = config["dataset"]["bdd100k"]["train"]["images_path"]
         random_image = random.choice(os.listdir(test_image_folder))
         img_path = os.path.join(test_image_folder, random_image)
         resize_height = int(config["main"]["resize_height"])
@@ -90,6 +94,21 @@ class LaneNetEvaluator:
                 "test_output", os.path.splitext(random_image)[0] + "_binary_output.jpg"
             ),
             binary_pred,
+        )
+
+        binary_pred = binary_pred.astype(np.uint8)
+
+        # Apply a colormap to the binary mask for better visualization
+        colored_mask = cv2.applyColorMap(binary_pred, cv2.COLORMAP_JET)
+
+        # Blend the original image and the colored mask
+        blended_image = cv2.addWeighted(input, 0.7, colored_mask, 0.3, 0)
+
+        cv2.imwrite(
+            os.path.join(
+                "test_output", os.path.splitext(random_image)[0] + "_blended_output.jpg"
+            ),
+            blended_image,
         )
 
 
@@ -187,7 +206,16 @@ if __name__ == "__main__":
         mask = Image.open(mask_path).convert("L")  # Convert mask to grayscale
 
         evaluator.evaluate(image, mask)
+
     elif model_name == "LaneNet":
-        evaluator = LaneNetEvaluator(model_path="models/Lane_Model_ENet.pth")
+        checkpoint_path = "models/checkpoint_30.pth"
+        checkpoint = None
+        if not torch.cuda.is_available():
+            checkpoint = torch.load(checkpoint_path, map_location=torch.device("cpu"))
+        else:
+            checkpoint = torch.load(checkpoint_path)
+
+        evaluator = LaneNetEvaluator(model_path="", checkpoint=checkpoint)
+
         for i in range(10):
             evaluator.test()
