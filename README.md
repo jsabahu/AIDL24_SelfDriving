@@ -24,6 +24,7 @@
   * [Transfer Learning Code](#63-transfer-learning-code)
 * [Models Comparison](#7-models-comparison)
 * [Validation With Our Own Images](#validation-with-our-own-images)
+* [Validation With Youtube Videos](#validation-with-youtube-videos)
 * [Conclusion And Future Work](#conclusion-and-future-work)
 * [References](#references)
 
@@ -353,7 +354,7 @@ The results were good, but not as good as we expected. At this point we decided 
 ![alt text](<results/LaneNET v1.png>)
 *Figure3: LaneNET trained with bdd100k dataset*
 
-## Validation With Our Own Images
+## 8. Validation With Our Own Images
 
 The next step was implement both models in a real video to validate real-world performance. It was done using a mobile in a car, driving on the highway.
 
@@ -416,12 +417,19 @@ To decide the color, we use the lower height of the box predicted. The results a
 
 The experiment was a success.
 
-## Conclusion And Future Work
+## 9. Validation with Youtube Videos
+
+| LaneNet | FasterRCNN Object Detection | MaskRCNN Segmentation |
+| ------------- | ------------- | ------------- |
+| ![til](https://github.com/jsabahu/AIDL24_SelfDriving/blob/dev/results/youtube_dashcam_processed_LaneNet.gif)  | ![til](https://github.com/jsabahu/AIDL24_SelfDriving/blob/dev/results/youtube_dashcam_processed_FasterRCNN.gif)  | ![til](https://github.com/jsabahu/AIDL24_SelfDriving/blob/dev/results/youtube_dashcam_processed_MaskRCNN.gif)  |
+
+
+## 10. Conclusion And Future Work
 
 Our project demonstrates how complicate is develop, debug and apply a model from scratch. We confirm how important is start from verified models and if it is possible pre-trained models to save time and resources for training. On the other side, we observe how from the theory, a model can be created from scratch and also works.
 A future work could focus on improve the models performance to be applied faster in real time, add new inputs additionally to a camera and develop a more sophisticated algorithms for self-driving.
 
-## 2. How to run
+## 11. How to run
 
 - Clone repository
 ```
@@ -450,7 +458,7 @@ https://dl.cv.ethz.ch/bdd100k/data/
 python bdd100k_transform.py --src_dir path/to/bdd100k --val True --test True
 ```
 
-## References
+## 12. References
 
 1. [LaneNet: Real-Time Lane Detection Networks for Autonomous Driving](https://arxiv.org/pdf/1807.01726)
 2. [Towards End-to-End Lane Detection: an Instance Segmentation Approach](https://arxiv.org/pdf/1802.05591)
@@ -463,7 +471,7 @@ python bdd100k_transform.py --src_dir path/to/bdd100k --val True --test True
 9. [Feature Pyramid Networks for Object Detection](https://arxiv.org/pdf/1612.03144)
 10. [ImageNet Large Scale Visual Recognition Challenge](https://arxiv.org/pdf/1409.0575)
 
-## Contributors
+## 13. Contributors
 
 - [Jordi Sabates](https://www.github.com/jsabahu)
 - [Marc Ramon](https://github.com/MarcRamonMoreno)
