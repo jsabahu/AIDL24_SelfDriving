@@ -360,7 +360,7 @@ The next step was implement both models in a real video to validate real-world p
 
 ![til](https://github.com/jsabahu/AIDL24_SelfDriving/blob/dev/results/MaskRCNN%20vs%20LaneNET.gif)
 
-The LaneNet model (right side) was a lot better than the Mask R-CNN (left side), like we expected. the surprising was that both models were able to detect the lines in really bad quality video.
+The LaneNet model (right side) was a lot better than the Mask R-CNN (left side), like we expected. the surprising was that both models were able to detect the lines.
 
 To achieve our goal we had some troubles like:
   - The images size applied on the model had to match with the trained images size to get good results.
