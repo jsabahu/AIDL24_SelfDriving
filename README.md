@@ -307,30 +307,26 @@ This model has been trained using 4 CPUs because we have a configuration with 4 
 
 ## 5. Training
 
-Training the three models is a long process requiring if it is possible use at least one gpu. The first step is prepare the environment by installing the requirements.
+Training the three models is a long process requiring if it is possible use at least one gpu.\
+The source code is prepared to use tensorboard for analysis.\
+Every model must be trained separetly by choosing the righ one in the main as follows:\
 
-  pip install -r "...\requirements.txt"
-
-The source code is prepared to use tensorboard for analysis.
-
-Every model must be trained separetly by choosing the righ one in the main as follows:
-
-![alt text](<results/Main Train Selection.png>)
+![alt text](<results/Main Train Selection.png>)\
 *Figure1: Model Selection*
 
 From the "configs/config.yaml" the training parameters are available. There the Hyperparameters con be configured. An example of the used parameters is the following:
 
-![alt text](<results/Config Hyperparameters.png>)
+![alt text](<results/Config Hyperparameters.png>)\
 *Figure2: Hyperparameters*
 
 After the training, the model parametrization file, will be created in the models folder. Use this file for any simulation.
 
 Some examples we get of loss/accuracy are show below:
 
-![alt text](<results/LaneNet Train.png>)
+![alt text](<results/LaneNet Train.png>)\
 *Figure3: LaneNet training*
 
-![alt text](<results/Mask RCNN Train.png>)
+![alt text](<results/Mask RCNN Train.png>)\
 *Figure4: Mask R-CNN training*
 
 ## 6. Transfer Learning
