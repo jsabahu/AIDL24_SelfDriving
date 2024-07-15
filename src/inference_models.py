@@ -5,7 +5,7 @@ from torchvision.models.detection import (
 )
 import torch.nn.functional as F
 from torchvision.utils import draw_bounding_boxes
-from torchvision.transforms.functional import to_pil_image
+from torchvision.transforms.functional import to_pil_image, pil_to_tensor
 
 from torchvision.io.image import read_image
 from torchvision.models.segmentation import fcn_resnet50, FCN_ResNet50_Weights
@@ -20,18 +20,16 @@ import torch
 import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
-import os
-import random
 from models.model_mask_R_CNN import LaneDetectionModel
 from logger import Logger
 from utils import read_yaml
-from models.model_ENet import ENet
-from torchviz import make_dot
 from models.LaneNet.LaneNet import LaneNet
 from torchvision import transforms
 import numpy as np
 import cv2
 from utils import generate_full_image_rois
+import cv2
+import imageio
 
 
 logger = Logger()
@@ -109,6 +107,8 @@ def inference_fastRCNN(img):
     # Step 4: Use the model and visualize the prediction
     prediction = model(batch)[0]
     labels = [weights.meta["categories"][i] for i in prediction["labels"]]
+    if isinstance(img, Image.Image):
+        img = pil_to_tensor(img)
     box = draw_bounding_boxes(
         img,
         boxes=prediction["boxes"],
@@ -133,8 +133,11 @@ def inference_LaneNet(img):
 
     evaluator = LaneNetEvaluator(model_path="", checkpoint=checkpoint)
 
-    # Convert torch tensor to PIL Image
-    img_pil = to_pil_image(img)
+    if not isinstance(img, Image.Image):
+        # Convert torch tensor to PIL Image
+        img_pil = to_pil_image(img)
+    else:
+        img_pil = img
 
     im = evaluator.output_img(img_pil)
 
@@ -215,45 +218,45 @@ def inference_MaskRCNN(img):
     masks = predictions[0]["masks"]
     labels = predictions[0]["labels"]
 
+    # Define colors for each category
+    category_colors = {
+        "car": (255, 0, 0),  # Red
+        "motorcycle": (0, 255, 0),  # Green
+        "bus": (0, 0, 255),  # Blue
+        "truck": (255, 255, 0),  # Yellow
+        "traffic light": (255, 0, 255),  # Magenta
+    }
+
     # Categories of interest
     categories_of_interest = [
         "car",
-        "motorcycle",
-        "bus",
-        "truck",
-        "traffic light",
     ]
 
-    # Find the masks corresponding to the specified categories
-    combined_masks = torch.zeros_like(masks[0, 0])
+    # Convert the original image to a numpy array
+    if not isinstance(img, Image.Image):
+        input_img = np.array(to_pil_image(img))
+    else:
+        input_img = np.array(img)
+
+    # Resize the input image if necessary
+    input_img_resized = cv2.resize(input_img, (input_img.shape[1], input_img.shape[0]))
+
+    # Create a blank mask for the combined masks
+    combined_mask = np.zeros_like(input_img_resized)
+
+    # Find the masks corresponding to the specified categories and apply colors
     for i, label in enumerate(labels):
         category = weights.meta["categories"][label.item()]
         if category in categories_of_interest:
-            combined_masks = torch.max(combined_masks, masks[i, 0])
+            mask = masks[i, 0].cpu().numpy()
+            mask = (mask > 0.99).astype(np.uint8) * 255
+            color = category_colors[category]
+            colored_mask = np.zeros_like(input_img_resized)
+            colored_mask[mask == 255] = color
+            combined_mask = cv2.addWeighted(combined_mask, 1.0, colored_mask, 0.5, 0)
 
-    # Convert the mask to a binary mask
-    binary_mask = (combined_masks > 0.5).byte().cpu().numpy() * 255
-
-    # Apply a colormap only to the white pixels of the binary mask
-    colored_mask = cv2.applyColorMap(binary_mask, cv2.COLORMAP_AUTUMN)
-
-    # Create a mask where the binary mask is white
-    white_mask = binary_mask == 255
-
-    # Apply the white mask to the colored mask
-    masked_colored_mask = np.zeros_like(colored_mask)
-    masked_colored_mask[white_mask] = colored_mask[white_mask]
-
-    # Convert the original image to a numpy array
-    input_img = np.array(to_pil_image(img))
-
-    # Resize the masked colored mask to match the original image size
-    masked_colored_mask = cv2.resize(
-        masked_colored_mask, (input_img.shape[1], input_img.shape[0])
-    )
-
-    # Blend the original image and the masked colored mask
-    blended_image = cv2.addWeighted(input_img, 0.7, masked_colored_mask, 0.3, 0)
+    # Blend the original image and the combined mask
+    blended_image = cv2.addWeighted(input_img_resized, 0.7, combined_mask, 0.3, 0)
 
     # Convert to PIL image for consistent output format
     blended_image_pil = Image.fromarray(blended_image)
@@ -261,7 +264,61 @@ def inference_MaskRCNN(img):
     return blended_image_pil
 
 
+def video_to_frames(video_path):
+    # Open the video file
+    vidcap = cv2.VideoCapture(video_path)
+    success, image = vidcap.read()
+    frames = []
+
+    while success:
+        # Convert the frame from BGR (OpenCV format) to RGB (PIL format)
+        image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        # Convert the frame to a PIL Image
+        pil_image = Image.fromarray(image_rgb)
+        frames.append(pil_image)
+        success, image = vidcap.read()
+
+    vidcap.release()
+    return frames
+
+
+def frames_to_gif(frames, gif_path, duration=0.1):
+    """
+    Converts a list of PIL images to a GIF.
+
+    Parameters:
+        frames (list): List of PIL Image frames.
+        gif_path (str): Path where the GIF will be saved.
+        duration (float): Duration of each frame in seconds.
+    """
+    # Convert frames to numpy arrays
+    frames_np = [np.array(frame) for frame in frames]
+
+    # Save the frames as a GIF
+    imageio.mimsave(gif_path, frames_np, duration=duration)
+
+
 if __name__ == "__main__":
-    img = read_image("data/bdd100ktrans/images/100k/train/fe16aa77-810c2e1f.jpg")
-    im = inference_MaskRCNN(img)
-    im.show()
+    video_path = "data/selfmade/youtube_dashcam.mp4"
+    # img = read_image("data/bdd100ktrans/images/100k/train/fe16aa77-810c2e1f.jpg")ç
+    frames = video_to_frames(video_path=video_path)
+    processed_frames_LaneNet = []
+    processed_frames_FasterRCNN = []
+    processed_frames_MaskRCNN = []
+    count = 0
+    for img in frames:
+        print(f"Processing image --> {count}/{len(frames)}")
+        processed_frames_LaneNet.append(inference_LaneNet(img))
+        processed_frames_FasterRCNN.append(inference_fastRCNN(img))
+        processed_frames_MaskRCNN.append(inference_MaskRCNN(img))
+        count += 1
+
+    frames_to_gif(
+        processed_frames_LaneNet, "results/youtube_dashcam_processed_LaneNet.gif"
+    )
+    frames_to_gif(
+        processed_frames_FasterRCNN, "results/youtube_dashcam_processed_FasterRCNN.gif"
+    )
+    frames_to_gif(
+        processed_frames_MaskRCNN, "results/youtube_dashcam_processed_MaskRCNN.gif"
+    )
