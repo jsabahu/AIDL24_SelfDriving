@@ -466,7 +466,7 @@ python bdd100k_transform.py --src_dir path/to/bdd100k --val True --test True
 ## Contributors
 
 - [Jordi Sabates](https://www.github.com/jsabahu)
-- Marc Ramon
+- [Marc Ramon](https://github.com/MarcRamonMoreno)
 - Marc Giné
 - Fermin Gomila
 
