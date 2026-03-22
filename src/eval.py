@@ -7,15 +7,17 @@ import numpy as np
 from torcheval.metrics.functional import binary_accuracy
 import matplotlib.pyplot as plt
 from logger import Logger
+from torch.utils.tensorboard import SummaryWriter
 
-# Set up logging
+# Initialize tensorboard writer and logger
 logger = Logger()
-logging.basicConfig(level=logging.INFO)
+writer = SummaryWriter()
 
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 # Parameters to use
 config_path = "configs/config.yaml"
 config = read_yaml(config_path)
+
 
 def eval_single_epoch(model, val_loader):
     accs, losses = [], []
@@ -30,10 +32,11 @@ def eval_single_epoch(model, val_loader):
             accs.append(acc.item())
     return np.mean(losses), np.mean(accs)
 
+
 def eval_mask_rCNN(model, hparams, eval_loader, rois, device):
 
     model.to(device)  # Move model to device
-    # Model in train mode
+    # Model in eval mode
     model.eval()
 
     # Initialize loss function
@@ -52,7 +55,9 @@ def eval_mask_rCNN(model, hparams, eval_loader, rois, device):
         # Apply the weights and sum across the channel dimension
         output = (output * weights).sum(dim=1, keepdim=True)
         # Reshape output & masks
-        output = F.interpolate(output, size=hparams["target_size"], mode="bilinear", align_corners=False)
+        output = F.interpolate(
+            output, size=hparams["target_size"], mode="bilinear", align_corners=False
+        )
         output = output.reshape(-1).type(torch.float)
         masks = masks.reshape(-1).type(torch.float)  # Convert masks to float
         # Compute loss
@@ -62,7 +67,11 @@ def eval_mask_rCNN(model, hparams, eval_loader, rois, device):
         # Add loss & acc to list
         ev_loss.append(loss.item())
         ev_acc.append(acc.item())
-    
+
+        writer.add_scalar(f"Loss eval", loss.item())
+        writer.add_scalar(f"Acc eval", acc.item())
+
+    writer.flush()
     # Plot loast & Accuracy
     plt.figure(figsize=(10, 8))
     plt.subplot(2, 1, 1)

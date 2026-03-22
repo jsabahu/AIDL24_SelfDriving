@@ -377,4 +377,4 @@ if __name__ == "__main__":
     # The model takes images and RoIs as input, processes them through the backbone, FPN, RoI align,
     # and the semantic lane head to produce the final lane detection mask logits.
     model_LaneDetectionModel = LaneDetectionModel()
-    show_sample(model_LaneDetectionModel,image_path,mask_path,rois,device)
+    show_sample(model_LaneDetectionModel, image_path, mask_path, rois, device)

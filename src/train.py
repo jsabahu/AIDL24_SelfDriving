@@ -5,14 +5,13 @@ import torch.optim as optim
 import numpy as np
 from torcheval.metrics.functional import binary_accuracy
 from utils import read_yaml
-from utils import binary_accuracy_with_logits, save_model
-from models.modelDebug import SimpleSegmentationModel  # Debug Model
 from logger import Logger
 from torch.utils.tensorboard import SummaryWriter
 import matplotlib.pyplot as plt
 from time import time
 import copy
 from models.LaneNet.train_lanenet import compute_loss
+import os
 
 # Initialize tensorboard writer and logger
 writer = SummaryWriter()
@@ -28,41 +27,8 @@ except Exception as e:
     raise
 
 
-def train_single_epoch(model, train_loader, optimizer, device):
-    model.train()  # Model in training mode
-    accs, losses = [], []  # Init accuracies and losses
-    for Image_cnt, (images, masks) in enumerate(train_loader):
-        logger.log_info(f"Processing image {Image_cnt+1}/{len(train_loader)}")
-        # Move data to device
-        images, masks = images.to(device), masks.to(device)
-        # Set network gradients to 0.
-        optimizer.zero_grad()  # Restart gradients
-        # Forward batch of images through the network
-        output = model(images)
-        # Reshape output & masks
-        output = output.reshape(-1)
-        masks = masks.reshape(-1)
-        # Compute loss
-        # loss = F.binary_cross_entropy_with_logits(output, masks)  # Calculate loss
-        loss = compute_loss(output, binary_label=masks)
-        # Backward pass: compute gradients of the loss with respect to model parameters
-        loss.backward()
-        # Update parameters of the network
-        optimizer.step()
-        # Compute metrics
-        acc = binary_accuracy_with_logits(
-            masks, output
-        )  # Not clear! Function using like "Lab 3" from projects
-        # Add loss to list
-        losses.append(loss.item())
-        # Add accuracy to list
-        accs.append(acc.item())
-    # Add loss and accuracy mean
-    return np.mean(losses), np.mean(accs)
-
-
 def single_epoch_lane_model(
-    model, dataloader, optimizer, device, phase, loss_type="FocalLoss"
+    model, dataloader, optimizer, device, phase, epoch, loss_type="FocalLoss"
 ):
     """
     Train or val the lane detection model for a single epoch.
@@ -112,7 +78,7 @@ def single_epoch_lane_model(
         # acc = binary_accuracy(outputs_flat, masks_flat, threshold=0.5)
 
         logger.log_debug(
-            f"{phase} phase: Step {step}/{len(dataloader)}: loss={running_loss}, loss_b={running_loss_b}, loss_i={running_loss_i}, acc=Nocomputed"
+            f"Epoch: {epoch} {phase} phase: Step {step}/{len(dataloader)}: loss={running_loss}, loss_b={running_loss_b}, loss_i={running_loss_i}, acc=Nocomputed"
         )
 
         losses.append(running_loss)
@@ -138,15 +104,28 @@ def train_model(
     val_loader: DataLoader,
     optimizer,
     device,
+    resume: bool = False,
+    checkpoint_path: str = "checkpoint.pth",
 ):
     t1 = time()
-    logger.log_debug("Starting model training")
-    training_log = {"epoch": [], "training_loss": [], "val_loss": []}
-    best_loss = float("inf")
-    best_model_wts = copy.deepcopy(model.state_dict())
     num_epochs = hparams["num_epochs"]
 
-    for epoch in range(num_epochs):
+    if resume and os.path.exists(checkpoint_path):
+        checkpoint = torch.load(checkpoint_path)
+        model.load_state_dict(checkpoint["model_state_dict"])
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        start_epoch = checkpoint["epoch"] + 1
+        best_loss = checkpoint["best_loss"]
+        training_log = checkpoint["training_log"]
+        logger.log_debug(f"Resuming training from epoch {start_epoch}")
+    else:
+        start_epoch = 0
+        best_loss = float("inf")
+        training_log = {"epoch": [], "training_loss": [], "val_loss": []}
+        best_model_wts = copy.deepcopy(model.state_dict())
+        logger.log_debug(f"Starting training model for {num_epochs} epochs")
+
+    for epoch in range(start_epoch, num_epochs):
         training_log["epoch"].append(epoch)
         logger.log_debug("Epoch {}/{}".format(epoch, num_epochs - 1))
         logger.log_debug("-" * 10)
@@ -159,6 +138,7 @@ def train_model(
                     dataloader=train_loader,
                     optimizer=optimizer,
                     device=device,
+                    epoch=epoch,
                     phase=phase,
                 )
             elif phase == "val":
@@ -167,6 +147,7 @@ def train_model(
                     dataloader=val_loader,
                     optimizer=optimizer,
                     device=device,
+                    epoch=epoch,
                     phase=phase,
                 )
 
@@ -187,6 +168,18 @@ def train_model(
                 if loss < best_loss:
                     best_loss = loss
                     best_model_wts = copy.deepcopy(model.state_dict())
+                    torch.save(model.state_dict(), checkpoint_path + "_model.pth")
+
+        # Save checkpoint
+        checkpoint = {
+            "epoch": epoch,
+            "model_state_dict": model.state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+            "best_loss": best_loss,
+            "training_log": training_log,
+        }
+        torch.save(checkpoint, checkpoint_path)
+        logger.log_debug(f"Checkpoint saved at epoch {epoch}")
 
     t2 = time() - t1
 
@@ -199,57 +192,6 @@ def train_model(
     # load best model weights
     model.load_state_dict(best_model_wts)
     return model, training_log
-
-
-def train_model2(hparams, train_loader, device):
-    # First trials, just one class: Line road??
-    model = SimpleSegmentationModel().to(device)  # Just one class: "LINE ROAD"?<-
-    logger.log_info("Train Model Called")
-    # Initialize optimizer (possibility to create specific optimizer call from utils)
-    # Self-drive examples found use the Adam optimizer
-    optimizer = optim.Adam(
-        model.parameters(),
-        lr=hparams["lr"],
-        weight_decay=hparams["weight_decay"],
-    )  # Note use weight_decay to prevent overfitting
-    logger.log_info("Train Optimizer")
-    # Initialize Parameters
-    best_loss = float("inf")  # Inicialitzar best_loss
-    tr_loss, tr_acc = [], []
-
-    num_epoch = hparams["num_epochs"]
-    for epoch in range(num_epoch):
-        # Train model for 1 epoch
-        logger.log_info(f"Train Epoch {epoch+1}/{num_epoch}")
-        train_loss, train_acc = train_single_epoch(
-            model, train_loader, optimizer, device
-        )
-        logger.log_info(
-            f"Train Epoch {epoch} loss={train_loss:.2f} acc={train_acc:.2f}"
-        )
-        # Save best lost
-        if train_loss < best_loss:
-            best_loss = train_loss
-            torch.save(model.state_dict(), "best_model.pth")
-            logger.log_info(f"Saved best model with loss {best_loss:.2f}")
-        tr_loss.append(train_loss)
-        tr_acc.append(train_acc)
-
-    # Plot loast & Accuracy
-    plt.figure(figsize=(10, 8))
-    plt.subplot(2, 1, 1)
-    plt.xlabel("Epoch")
-    plt.ylabel("Loss")
-    plt.plot(tr_loss, label="train")
-    plt.legend()
-    plt.subplot(2, 1, 2)
-    plt.xlabel("Epoch")
-    plt.ylabel("Accuracy [%]")
-    plt.plot(tr_acc, label="train")
-    plt.legend()
-    plt.show()
-
-    return model
 
 
 def binary_accuracy(output, masks, threshold=0.5):
@@ -284,8 +226,11 @@ def train_mask_rCNN(model, hparams, train_loader, rois, device):
         # Train model for 1 epoch
         logger.log_info(f"Train Epoch {epoch+1}/{num_epoch}")
         tr_loss_temp, tr_acc_temp = [], []
-        for Image_cnt, (images, masks) in enumerate(train_loader):
-            logger.log_info(f"Processing image {Image_cnt+1}/{len(train_loader)}")
+        for step, (images, masks) in enumerate(train_loader):
+            logger.log_info(
+                f"Processing step {step+1}/{len(train_loader)} in epoch: {epoch}/{num_epoch}"
+            )
+
             # Set network gradients to 0.
             optimizer.zero_grad()  # Restart gradients
             # Move data to device
@@ -326,4 +271,9 @@ def train_mask_rCNN(model, hparams, train_loader, rois, device):
         tr_loss.append(tr_mean_loss)
         tr_acc.append(tr_mean_acc)
 
+        writer.add_scalar(f"Loss train", loss, epoch)
+        writer.add_scalar(f"Acc train", acc, epoch)
+
+    writer.flush()
+    logger.log_info("Training complete")
     return tr_loss, tr_acc

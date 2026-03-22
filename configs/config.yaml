@@ -78,19 +78,30 @@ dataset:
     val:
       images_path: "data/bdd100k/images/100k/val"
       labels_path: "data/bdd100k/labels/lane/masks/val"
+    training_path: "data/bdd100k/training"
   tusimple:
     train:
       dir: "data/TuSimpleDataset/training"
     test:
       dir: "data/TuSimpleDataset/testing"
       images_path: "data/TuSimpleDataset/testing/gt_image"
+  dataset_Faster_R_CNN:
+      root: "data/bdd_100k_F_R_CNN/100k_images_train/bdd100k/images/100k/train"
+      annotation_file: "data/bdd_100k_F_R_CNN/bdd100k_det_20_labels_trainval/bdd100k/labels/det_20/det_train.json"
+      val_root: "data/bdd_100k_F_R_CNN/100k_images_val/bdd100k/images/100k/val"
+      val_annotation_file: "data/bdd_100k_F_R_CNN/bdd100k_det_20_labels_trainval/bdd100k/labels/det_20/det_val.json"
 
+
+transforms:
+  resize_height: 400
+  resize_width: 400
+  antialias: True
 
 main:
   log_filename: "main.log"
   logs_dir: "logs/"
-  resize_height: "720"
-  resize_width: "1280"
+  resize_height: "536"
+  resize_width: "960"
 
 
 resolution:
@@ -98,3 +109,17 @@ resolution:
   480p: [480, 854]
   360p: [360,640]
   240p: [240,426]
+
+hyperparameters:
+  batch_size: 1
+  shuffle: True
+  num_workers: 4
+  num_classes: 1  # 1 class (car+truck)
+  learning_rate: 0.005
+  momentum: 0.9
+  weight_decay: 0.0005
+  step_size: 3
+  gamma: 0.1
+  num_epoch: 15
+  accumulation_steps: 8
+  patience: 15

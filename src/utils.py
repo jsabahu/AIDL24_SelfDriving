@@ -12,6 +12,7 @@ from torchvision import transforms
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
 import cv2
+import numpy as np
 
 logger = Logger()
 
@@ -192,34 +193,65 @@ def save_model(model: torch.nn.Module, model_name: str):
     save_folder.mkdir(parents=True, exist_ok=True)
     filepath = save_folder / model_name
     torch.save(model.state_dict(), filepath)
-    logger.log_debug(f"Model saved at {filepath}")
+    # logger.log_debug(f"Model saved at {filepath}")
 
 
-def generate_full_image_rois(batch_size, target_size):
+def generate_full_image_rois(batch_size, target_size, mode):
     rois = []
+    # Mode 0, full image
+    # Mode 1, 2/3 of image
+    # Mode 2, 3/4 of image
+    # Mode 3, 1/2 of image
+    # Mode 4, fixed 180x320 centered horizontal bottom of image
     for i in range(batch_size):
         # RoI format: [batch_index, x1, y1, x2, y2]
-        rois.append([i, 0, 0, target_size[0], target_size[1]])
+        if (mode == 0) or (mode > 4):
+            rois.append([i, 0, 0, target_size[0], target_size[1]])
+        if mode == 1:
+            rois.append([i, 0, 0, target_size[0] * 0.66, target_size[1]])
+        if mode == 2:
+            rois.append([i, 0, 0, target_size[0] * 0.75, target_size[1]])
+        if mode == 3:
+            rois.append([i, 0, 0, target_size[0] * 0.5, target_size[1]])
+        if mode == 4:
+            rois.append(
+                [
+                    i,
+                    (target_size[0] - 180) / 2,
+                    0,
+                    (target_size[0] - 180) / 2 + 180,
+                    320,
+                ]
+            )
     return torch.tensor(rois, dtype=torch.float32)
 
 
-def show_sample(model, image_path, mask_path, rois, device):
+def show_sample(model, image_path, mask_path, target_size, device):
+
     # Read Image & Mask Example
     image = Image.open(image_path).convert("RGB")  # Ensure image is in RGB mode
     mask = Image.open(mask_path).convert("L")  # Convert mask to grayscale
 
     # Prepare image
-    target_size = (180, 320)
     transform = transforms.Compose(
         [transforms.ToTensor(), transforms.Resize(target_size, antialias=True)]
     )
     images = transform(image)
     images = images.unsqueeze(0)
-    output = model(images, rois)
-    predicted_mask = F.interpolate(
-        output, size=(720, 1280), mode="bilinear", align_corners=False
+
+    # Get output from model
+    output = model(images, generate_full_image_rois(1, target_size, 0))
+    # Apply weights
+    weights = torch.tensor([0.2989, 0.5870, 0.1140], device=device).view(1, 3, 1, 1)
+    output = (output * weights).sum(dim=1, keepdim=True)
+    # Scale to target_size
+    output = F.interpolate(
+        output, size=target_size, mode="bilinear", align_corners=False
     )
-    logger.log_debug("predicted_mask: %s," + str(predicted_mask.shape))
+    # Normalize to 0-1 range
+    output = (output - output.min()) / (output.max() - output.min())
+    # Apply threshold to eliminate noise
+    output = (output > 0.001).type(torch.int)
 
     # Prepare mask
     transform_mask = transforms.Compose(
@@ -234,27 +266,95 @@ def show_sample(model, image_path, mask_path, rois, device):
         images[0].numpy().transpose(1, 2, 0)
     )  # Convert to HWC format for plotting
     mask_np = masks[0].numpy().transpose(1, 2, 0)  # Convert to HWC format for plotting
-
-    # Define the weights for the RGB to grayscale conversion
-    weights = torch.tensor([0.2989, 0.5870, 0.1140], device=device).view(1, 3, 1, 1)
-    # Apply the weights and sum across the channel dimension
-    output = (output * weights).sum(dim=1, keepdim=True)
-    # Reshape output & masks
-    output = F.interpolate(
-        output, size=target_size, mode="bilinear", align_corners=False
-    )
-    predicted_mask_np = output.detach().cpu().numpy()[0].transpose(1, 2, 0)
+    output_np = output.detach().cpu().numpy()[0].transpose(1, 2, 0)
 
     # Plot the image and mask
     fig, axes = plt.subplots(1, 3, figsize=(10, 5))
     axes[0].imshow(image_np)
     axes[0].set_title("Image")
     axes[0].axis("off")
-    axes[1].imshow(mask_np)
+    axes[1].imshow(mask_np, cmap="gray")  # Display mask in grayscale
     axes[1].set_title("Mask")
     axes[1].axis("off")
-    axes[2].imshow(predicted_mask_np)
+    axes[2].imshow(output_np, cmap="gray")  # Display predicted mask in grayscale
     axes[2].set_title("Predicted Mask")
     axes[2].axis("off")
     plt.show()
     return
+
+
+def calculate_rotation_difference(img1, img2, type=0):
+    def find_centroid(img):
+        M = cv2.moments(img)
+        if M["m00"] != 0:
+            cx = int(M["m10"] / M["m00"])
+            cy = int(M["m01"] / M["m00"])
+        else:
+            cx, cy = 0, 0
+        return cx, cy
+
+    # Applied on mask
+    if type == 0:
+        # Find centroids of the binary image
+        cx1, cy1 = find_centroid(img1.astype(np.uint8))
+        cx2, cy2 = find_centroid(img2.astype(np.uint8))
+
+        # Calculate the angle between the centroids
+        angle1 = np.arctan2(cy1, cx1)
+        angle2 = np.arctan2(cy2, cx2)
+
+        # Calculate the rotation difference
+        rotation_difference = np.degrees(angle2 - angle1)
+
+        # Normalize the angle to the range [-180, 180]
+        rotation_difference = (rotation_difference + 180) % 360 - 180
+
+    # Applied on image
+    if type == 1:
+
+        # Convert images to numpy array
+        img1 = np.array(img1)
+        img2 = np.array(img2)
+
+        # Convert images to grayscale
+        gray1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
+        gray2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
+
+        # Initialize ORB detector
+        orb = cv2.ORB_create()
+
+        # Find keypoints and descriptors
+        keypoints1, descriptors1 = orb.detectAndCompute(gray1, None)
+        keypoints2, descriptors2 = orb.detectAndCompute(gray2, None)
+
+        # Initialize matcher
+        bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+
+        # Match descriptors
+        matches = bf.match(descriptors1, descriptors2)
+
+        # Sort matches by distance
+        matches = sorted(matches, key=lambda x: x.distance)
+
+        # Use the best 10 matches to estimate rotation
+        if len(matches) > 10:
+            matches = matches[:10]
+
+        src_pts = np.float32([keypoints1[m.queryIdx].pt for m in matches]).reshape(
+            -1, 1, 2
+        )
+        dst_pts = np.float32([keypoints2[m.trainIdx].pt for m in matches]).reshape(
+            -1, 1, 2
+        )
+
+        # Estimate affine transformation using RANSAC
+        M, _ = cv2.estimateAffinePartial2D(src_pts, dst_pts)
+
+        if M is None:
+            return 0.0  # No transformation estimated
+
+        # Calculate rotation angle
+        rotation_angle_rad = -np.arctan2(M[0, 1], M[0, 0])
+        rotation_difference = np.degrees(rotation_angle_rad)
+
+    return rotation_difference

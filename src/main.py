@@ -2,7 +2,7 @@ import torch
 from torch.utils import data
 from torchvision import transforms
 from dataloader import MaskDataset, TusimpleSet, Dataset_Mask_R_CNN
-from utils import read_yaml
+from utils import read_yaml, save_model
 from logger import Logger
 from train import train_model, train_mask_rCNN
 from hyperparameters import hparams
@@ -18,6 +18,7 @@ from utils import generate_full_image_rois, show_sample
 import yaml
 import matplotlib.pyplot as plt
 from eval import eval_mask_rCNN
+import models.model_Faster_R_CNN as FCnn
 
 logger = Logger()
 
@@ -34,20 +35,20 @@ except Exception as e:
     raise
 
 
-def main_jordi():
+def main_LaneNet():
     # Define hyperparameters
     hparams = {
-        "batch_size": 16,
+        "batch_size": 1,
         "lr": 0.05,
         "weight_decay": 0.01,
-        "num_epochs": 5,
+        "num_epochs": 100,
     }
 
     train_dataset_file = os.path.join(
-        config["dataset"]["tusimple"]["train"]["dir"], "train.txt"
+        config["dataset"]["bdd100k"]["training_path"], "train.txt"
     )
     val_dataset_path = os.path.join(
-        config["dataset"]["tusimple"]["train"]["dir"], "val.txt"
+        config["dataset"]["bdd100k"]["training_path"], "val.txt"
     )
 
     resize_height = int(config["main"]["resize_height"])
@@ -106,6 +107,8 @@ def main_jordi():
         f"{hparams['num_epochs']} epochs {len(train_dataset)} training samples\n"
     )
 
+    checkpoint_path = os.path.join(config["main"]["logs_dir"], "checkpoint.pth")
+
     model, log = train_model(
         model,
         hparams=hparams,
@@ -113,6 +116,8 @@ def main_jordi():
         val_loader=val_loader,
         optimizer=optimizer,
         device=DEVICE,
+        resume=True,
+        checkpoint_path=checkpoint_path,
     )
 
     df = pd.DataFrame({"epoch": [], "training_loss": [], "val_loss": []})
@@ -132,7 +137,7 @@ def main_jordi():
     )
     logger.log_debug("training log is saved: {}".format(train_log_save_filename))
 
-    model_save_filename = f"models/Lane_Model_ENet_{time.time()}.pth"
+    model_save_filename = f"models/Lane_Model_LaneNet.pth"
     torch.save(model.state_dict(), model_save_filename)
     logger.log_debug("model is saved: {}".format(model_save_filename))
 
@@ -154,8 +159,8 @@ def main_mask_R_CNN():
         "batch_size": 32,
         "lr": 0.0001,
         # "weight_decay": 0.1,
-        "num_epochs": 15,
-        "target_size": (180, 320),
+        "num_epochs": 100,
+        "target_size": (480, 854),
     }
 
     # Define Transform
@@ -170,8 +175,8 @@ def main_mask_R_CNN():
 
     # Create training dataset and DataLoader
     train_dataset = Dataset_Mask_R_CNN(
-        images_path=CONFIG["train"]["images_path"],
-        mask_path=CONFIG["train"]["labels_path"],
+        images_path=CONFIG["dataset"]["bdd100k"]["train"]["images_path"],
+        mask_path=CONFIG["dataset"]["bdd100k"]["train"]["labels_path"],
         batch_size=hparams["batch_size"],
         transform=transform,
         transform_mask=transform,
@@ -179,8 +184,8 @@ def main_mask_R_CNN():
 
     # Create training dataset and DataLoader
     eval_dataset = Dataset_Mask_R_CNN(
-        images_path=CONFIG["val"]["images_path"],
-        mask_path=CONFIG["val"]["labels_path"],
+        images_path=CONFIG["dataset"]["bdd100k"]["val"]["images_path"],
+        mask_path=CONFIG["dataset"]["bdd100k"]["val"]["labels_path"],
         batch_size=hparams["batch_size"],
         transform=transform,
         transform_mask=transform,
@@ -198,13 +203,15 @@ def main_mask_R_CNN():
     logger.log_info("Found eval " + str(len(eval_dataset)) + " samples")
 
     # Create Model
-    rois = generate_full_image_rois((hparams["batch_size"]), hparams["target_size"]).to(
-        device=DEVICE
-    )
+    rois = generate_full_image_rois(
+        (hparams["batch_size"]), hparams["target_size"], 0
+    ).to(device=DEVICE)
     model = LaneDetectionModel()
 
     # Train Model
     tr_loss, tr_acc = train_mask_rCNN(model, hparams, train_loader, rois, DEVICE)
+    save_model(model, "train_mask_rCNN_100k.pth")
+
     # Eval Model
     eval_loss, eval_acc = eval_mask_rCNN(model, hparams, eval_loader, rois, DEVICE)
     logger.log_info("Eval Loss: " + str(eval_loss) + " / Eval Acc:" + str(eval_acc))
@@ -223,20 +230,67 @@ def main_mask_R_CNN():
     plt.legend()
     plt.show()
 
-    image_path = "data\\bdd100k\\images\\100k\\val\\fdc07c32-1af45031.jpg"
-    mask_path = "data\\bdd100k\\labels\\lane\\masks\\val\\fdc07c32-1af45031.png"
+    image_path = "data\\bdd100k\\images\\100k\\test\\6558820b-6e0594fa.jpg"
+    mask_path = "data\\bdd100k\\labels\\lane\\masks\\test\\6558820b-6e0594fa.png"
     show_sample(
         model,
         image_path,
         mask_path,
-        generate_full_image_rois(1, hparams["target_size"]),
+        hparams["target_size"],
         DEVICE,
     )
 
 
+def main_Faster_R_CNN():
+    # Load configuration
+    config = FCnn.load_config()
+
+    # Paths from config
+    root = config["dataset"]["dataset_Faster_R_CNN"]["root"]
+    annotation_file = config["dataset"]["dataset_Faster_R_CNN"]["annotation_file"]
+    val_root = config["dataset"]["dataset_Faster_R_CNN"]["val_root"]
+    val_annotation_file = config["dataset"]["dataset_Faster_R_CNN"][
+        "val_annotation_file"
+    ]
+
+    # Transformations
+    transform = FCnn.create_transforms(config)
+
+    # Dataset and DataLoader for training
+    train_dataset = FCnn.BDDDataset(root, annotation_file, config, transforms=transform)
+    train_dataset = FCnn.Subset(
+        train_dataset, range(5)
+    )  # Limit training set to 500 images
+    train_loader = FCnn.create_data_loader(config, train_dataset)
+
+    # Dataset and DataLoader for validation
+    val_dataset = FCnn.BDDDataset(
+        val_root, val_annotation_file, config, transforms=transform, filter_annotations=False
+    )
+    val_valid_indices = range(
+        min(5, len(val_dataset))
+    )  # Limit validation set to 500 images
+    val_dataset = FCnn.Subset(val_dataset, val_valid_indices)
+    val_loader = FCnn.create_data_loader(config, val_dataset)
+
+    # Model
+    num_classes = config["hyperparameters"]["num_classes"]
+    model = FCnn.create_model(num_classes)
+
+    # Device
+    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    model.to(device)
+
+    # Train
+    FCnn.train_model(config, model, train_loader, val_loader, device)
+    # save_model(model, "Faster_R_CNN.pth")
+
+
 if __name__ == "__main__":
-    check = False
-    if check:
-        main_jordi()
-    else:
+    select = "FasterRCNN"
+    if select == "LaneNet":
+        main_LaneNet()
+    if select == "maskRCNN":
         main_mask_R_CNN()
+    if select == "FasterRCNN":
+        main_Faster_R_CNN()
